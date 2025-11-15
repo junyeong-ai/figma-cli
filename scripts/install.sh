@@ -9,7 +9,7 @@ set -e
 readonly BINARY_NAME="figma"
 readonly REPO="junyeong-ai/figma-cli"
 readonly INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
-readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/figma-cli"
+readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/figma-cli"  # Use XDG standard
 readonly SKILL_NAME="figma-design"
 readonly PROJECT_SKILL_DIR=".claude/skills/$SKILL_NAME"
 readonly USER_SKILL_DIR="$HOME/.claude/skills/$SKILL_NAME"
@@ -323,21 +323,33 @@ setup_config() {
         cat > "$CONFIG_DIR/config.toml" << 'EOF'
 # figma-cli configuration
 
-[auth]
-# Token will be set by 'figma auth login'
+# Get Figma token from https://www.figma.com/settings
 # token = "figd_..."
 
-[http]
-timeout_secs = 30
-max_retries = 3
-
 [extraction]
-default_depth = 5
-include_hidden = false
+depth = 5
+max_depth = 10
+styles = true
+components = true
+vectors = false
+
+[http]
+timeout = 30
+retries = 3
+retry_delay = 1000
+max_delay = 60000
+backoff = 2.0
 
 [images]
-default_format = "png"
-default_scale = 2.0
+scale = 2.0
+format = "png"
+
+[performance]
+concurrent = 50
+chunk_size = 100
+
+[cache]
+ttl = 24
 EOF
         log_success "Configuration created at $CONFIG_DIR/config.toml"
     fi

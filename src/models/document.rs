@@ -193,7 +193,11 @@ pub enum Node {
         )]
         absolute_bounding_box: Option<BoundingBox>,
 
-        #[serde(default, skip_serializing_if = "Option::is_none", with = "option_struct")]
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "option_struct"
+        )]
         style: Option<TypeStyle>,
     },
 
@@ -613,7 +617,9 @@ mod option_struct {
         if value.is_null() {
             return Ok(None);
         }
-        Ok(Some(serde_json::from_value(value).map_err(serde::de::Error::custom)?))
+        Ok(Some(
+            serde_json::from_value(value).map_err(serde::de::Error::custom)?,
+        ))
     }
 }
 
@@ -622,7 +628,11 @@ mod option_struct {
 pub struct Paint {
     #[serde(rename = "type", default)]
     pub paint_type: String,
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "option_struct")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "option_struct"
+    )]
     pub color: Option<Color>,
     #[serde(default = "default_opacity")]
     pub opacity: f64,

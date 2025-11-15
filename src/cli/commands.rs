@@ -3,6 +3,7 @@
 use crate::cli::args::{AuthCommand, ConfigCommand, ExtractArgs, ImagesArgs, InspectArgs};
 use crate::cli::output::format_output;
 use crate::client::{FigmaClient, TokenManager};
+use crate::core::Config;
 use crate::models::config::FilterCriteria;
 use crate::service::Orchestrator;
 use anyhow::{Context, Result};
@@ -218,7 +219,7 @@ fn handle_config_show(json: bool) -> Result<()> {
 
 /// Show config file paths
 fn handle_config_path() -> Result<()> {
-    let system_config = dirs::config_dir().map(|d| d.join("figma-cli").join("config.toml"));
+    let system_config = Config::default_config_path();
     let project_config = std::path::PathBuf::from("figma-cli.toml");
 
     println!();
@@ -403,9 +404,8 @@ fn mask_token(token: &str) -> String {
 
 /// Print available config files
 fn print_config_files() {
-    let system_config = dirs::config_dir()
-        .map(|d| d.join("figma-cli").join("config.toml"))
-        .and_then(|p| if p.exists() { Some(p) } else { None });
+    let system_config = Config::default_config_path()
+        .filter(|p| p.exists());
 
     let project_config = std::path::PathBuf::from("figma-cli.toml");
     let has_project = project_config.exists();

@@ -253,12 +253,20 @@ impl Config {
     }
 
     /// Get default config path
+    /// Uses XDG_CONFIG_HOME or ~/.config on all platforms
     pub fn default_config_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|mut p| {
-            p.push("figma-cli");
-            p.push("config.toml");
-            p
-        })
+        std::env::var("XDG_CONFIG_HOME")
+            .ok()
+            .map(PathBuf::from)
+            .or_else(|| dirs::home_dir().map(|mut p| {
+                p.push(".config");
+                p
+            }))
+            .map(|mut p| {
+                p.push("figma-cli");
+                p.push("config.toml");
+                p
+            })
     }
 
     /// Get config path (for compatibility)
