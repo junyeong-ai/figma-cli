@@ -194,9 +194,9 @@ pub struct ConfigArgs {
 pub enum ConfigCommand {
     /// Initialize configuration file
     Init {
-        /// Initialize global config (~/.config/figma-cli/config.toml)
+        /// Initialize project config (./figma-cli.toml) instead of global config
         #[arg(long)]
-        global: bool,
+        local: bool,
     },
 
     /// Show current configuration
@@ -211,9 +211,9 @@ pub enum ConfigCommand {
 
     /// Edit configuration file with default editor
     Edit {
-        /// Edit global config (~/.config/figma-cli/config.toml)
+        /// Edit project config (./figma-cli.toml) instead of global config
         #[arg(long)]
-        global: bool,
+        local: bool,
     },
 
     /// Set a configuration value

@@ -148,10 +148,10 @@ pub async fn handle_auth(command: AuthCommand) -> Result<()> {
 /// Handle config command
 pub async fn handle_config(command: ConfigCommand) -> Result<()> {
     match command {
-        ConfigCommand::Init { global } => handle_config_init(global),
+        ConfigCommand::Init { local } => handle_config_init(!local),
         ConfigCommand::Show { json } => handle_config_show(json),
         ConfigCommand::Path => handle_config_path(),
-        ConfigCommand::Edit { global } => handle_config_edit(global),
+        ConfigCommand::Edit { local } => handle_config_edit(!local),
         ConfigCommand::Set { key, value } => handle_config_set(&key, &value),
         ConfigCommand::Get { key } => handle_config_get(&key),
     }
@@ -356,12 +356,14 @@ fn handle_config_get(key: &str) -> Result<()> {
 /// Get config file path based on scope
 fn get_config_path(global: bool) -> Result<std::path::PathBuf> {
     if global {
-        let config_dir = dirs::config_dir()
-            .ok_or_else(|| anyhow::anyhow!("Cannot determine config directory"))?
-            .join("figma-cli");
+        let config_path = Config::default_config_path()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine config directory"))?;
 
-        std::fs::create_dir_all(&config_dir)?;
-        Ok(config_dir.join("config.toml"))
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        Ok(config_path)
     } else {
         Ok(std::path::PathBuf::from("figma-cli.toml"))
     }
