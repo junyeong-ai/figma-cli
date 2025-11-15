@@ -1,0 +1,77 @@
+# Rust Build Artifacts
+/target/
+debug/
+release/
+*.rs.bk
+*.rlib
+*.prof*
+
+# Cargo
+Cargo.lock  # For libraries - uncomment if this is a binary-only project
+
+# IDE Files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Test Coverage
+coverage/
+*.profdata
+*.profraw
+
+# Benchmarking Results
+benches/target/
+criterion/
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.Trash-*/
+.nfs*
+
+# Documentation Build
+/target/doc/
+
+# Release Artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Project-Specific
+# Claude configuration (only include skills)
+.claude/*
+!.claude/skills/
+
+# Development directories
+.specify/
+.serena/
+
+# Local configuration with sensitive data
+figma-cli.toml
