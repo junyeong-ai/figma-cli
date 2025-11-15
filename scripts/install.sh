@@ -101,15 +101,12 @@ check_dependencies() {
 get_latest_version() {
     local version
 
-    log_info "Fetching latest version..."
-
     version=$(curl -sf "https://api.github.com/repos/$REPO/releases/latest" \
         | grep '"tag_name"' \
         | sed -E 's/.*"v?([^"]+)".*/\1/' \
-        || echo "")
+        2>/dev/null || echo "")
 
     if [ -z "$version" ]; then
-        log_warning "Could not fetch latest version, trying fallback..."
         version="0.1.0"  # Fallback version
     fi
 
@@ -144,44 +141,44 @@ download_binary() {
     local url="https://github.com/$REPO/releases/download/v${version}/${archive}"
     local checksum_url="${url}.sha256"
 
-    log_info "Downloading figma-cli v${version} for ${target}..."
+    log_info "Downloading figma-cli v${version} for ${target}..." >&2
 
     # Download binary
-    if ! curl -fLO "$url" --progress-bar; then
-        log_error "Failed to download binary from $url"
+    if ! curl -fLO "$url" --progress-bar 2>&2; then
+        log_error "Failed to download binary from $url" >&2
         rm -rf "$temp_dir"
         return 1
     fi
 
     # Download and verify checksum
-    log_info "Verifying checksum..."
-    if curl -fsSLO "$checksum_url" 2>/dev/null; then
+    log_info "Verifying checksum..." >&2
+    if curl -fsSLO "$checksum_url" 2>&1 >&2; then
         if command -v sha256sum &> /dev/null; then
-            if ! sha256sum -c "${archive}.sha256" &> /dev/null; then
-                log_error "Checksum verification failed!"
+            if ! sha256sum -c "${archive}.sha256" >&2; then
+                log_error "Checksum verification failed!" >&2
                 rm -rf "$temp_dir"
                 return 1
             fi
         elif command -v shasum &> /dev/null; then
-            if ! shasum -a 256 -c "${archive}.sha256" &> /dev/null; then
-                log_error "Checksum verification failed!"
+            if ! shasum -a 256 -c "${archive}.sha256" >&2; then
+                log_error "Checksum verification failed!" >&2
                 rm -rf "$temp_dir"
                 return 1
             fi
         else
-            log_warning "No checksum tool found, skipping verification"
+            log_warning "No checksum tool found, skipping verification" >&2
         fi
-        log_success "Checksum verified"
+        log_success "Checksum verified" >&2
     else
-        log_warning "No checksum file available, skipping verification"
+        log_warning "No checksum file available, skipping verification" >&2
     fi
 
     # Extract archive
-    log_info "Extracting archive..."
+    log_info "Extracting archive..." >&2
     if [[ "$ext" == "zip" ]]; then
-        unzip -q "$archive"
+        unzip -q "$archive" >&2
     else
-        tar -xzf "$archive"
+        tar -xzf "$archive" >&2
     fi
 
     # Return path to binary
@@ -194,11 +191,9 @@ download_binary() {
 
 # Build from source as fallback
 build_from_source() {
-    log_info "Building from source..."
-
     # Check for Rust
     if ! command -v cargo &> /dev/null; then
-        log_error "Cargo not found. Please install Rust: https://rustup.rs"
+        log_error "Cargo not found. Please install Rust: https://rustup.rs" >&2
         return 1
     fi
 
@@ -207,8 +202,8 @@ build_from_source() {
     temp_dir=$(mktemp -d)
     cd "$temp_dir" || exit 1
 
-    git clone "https://github.com/$REPO.git" . || return 1
-    cargo build --release || return 1
+    git clone "https://github.com/$REPO.git" . >&2 || return 1
+    cargo build --release >&2 || return 1
 
     echo "$temp_dir/target/release/$BINARY_NAME"
 }
@@ -382,14 +377,20 @@ main() {
 
     # Try downloading prebuilt binary
     local binary_path
+    set +e  # Temporarily disable exit on error
     binary_path=$(download_binary "$latest_version" "$platform")
+    local download_result=$?
+    set -e  # Re-enable exit on error
 
     # Fall back to building from source if download fails
-    if [ $? -ne 0 ] || [ -z "$binary_path" ]; then
+    if [ $download_result -ne 0 ] || [ -z "$binary_path" ]; then
         log_warning "Prebuilt binary not available, trying to build from source..."
+        set +e
         binary_path=$(build_from_source)
+        local build_result=$?
+        set -e
 
-        if [ $? -ne 0 ] || [ -z "$binary_path" ]; then
+        if [ $build_result -ne 0 ] || [ -z "$binary_path" ]; then
             log_error "Installation failed"
             exit 1
         fi
