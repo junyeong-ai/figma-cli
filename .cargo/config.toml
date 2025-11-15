@@ -12,8 +12,12 @@ incremental = true
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]  # Use lld linker for faster linking
 
 [target.x86_64-apple-darwin]
-# macOS-specific optimizations
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+# macOS x86_64 - use default linker (ld64)
+# lld is not available by default on macOS
+
+[target.aarch64-apple-darwin]
+# macOS Apple Silicon - use default linker (ld64)
+# lld is not available by default on macOS
 
 [target.x86_64-pc-windows-msvc]
 # Windows-specific optimizations
