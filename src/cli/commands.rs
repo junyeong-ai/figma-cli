@@ -406,8 +406,7 @@ fn mask_token(token: &str) -> String {
 
 /// Print available config files
 fn print_config_files() {
-    let system_config = Config::default_config_path()
-        .filter(|p| p.exists());
+    let system_config = Config::default_config_path().filter(|p| p.exists());
 
     let project_config = std::path::PathBuf::from("figma-cli.toml");
     let has_project = project_config.exists();

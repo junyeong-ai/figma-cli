@@ -258,10 +258,12 @@ impl Config {
         std::env::var("XDG_CONFIG_HOME")
             .ok()
             .map(PathBuf::from)
-            .or_else(|| dirs::home_dir().map(|mut p| {
-                p.push(".config");
-                p
-            }))
+            .or_else(|| {
+                dirs::home_dir().map(|mut p| {
+                    p.push(".config");
+                    p
+                })
+            })
             .map(|mut p| {
                 p.push("figma-cli");
                 p.push("config.toml");
