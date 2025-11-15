@@ -1,0 +1,29 @@
+# Cargo build configuration
+# This file configures build settings for faster compilation and better optimization
+
+[build]
+# Use all available CPU cores for parallel compilation
+jobs = 8  # Adjust based on your CPU
+# Enable incremental compilation for faster rebuilds
+incremental = true
+
+[target.x86_64-unknown-linux-gnu]
+# Linux-specific optimizations
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]  # Use lld linker for faster linking
+
+[target.x86_64-apple-darwin]
+# macOS-specific optimizations
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.x86_64-pc-windows-msvc]
+# Windows-specific optimizations
+rustflags = ["-C", "link-arg=/DEBUG:NONE"]
+
+[profile.dev]
+# Development build settings
+split-debuginfo = "unpacked"  # Faster incremental builds
+
+[term]
+# Terminal output settings
+verbose = false
+color = "auto"
