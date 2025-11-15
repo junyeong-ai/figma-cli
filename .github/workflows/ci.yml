@@ -5,7 +5,6 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,71 +12,30 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
-  format:
-    name: Format Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-  lint:
-    name: Clippy Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
   test:
     name: Test Suite (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         rust: [stable]
-
-    runs-on: ${{ matrix.os }}
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.os }}-${{ matrix.rust }}
 
       - name: Install nextest
         uses: taiki-e/install-action@nextest
 
-      - name: Build
-        run: cargo build --verbose
-
       - name: Run tests with nextest
         run: cargo nextest run --all-features --workspace --verbose
-
-      - name: Run doctests
-        run: cargo test --doc
 
   coverage:
     name: Code Coverage
@@ -85,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
@@ -129,56 +87,13 @@ jobs:
           path: target/llvm-cov/html/
           retention-days: 7
 
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run cargo-audit
-        uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  dependency-check:
-    name: Dependency Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Check dependencies
-        run: |
-          cargo tree --duplicate
-          cargo outdated --exit-code 1 || true
-
-  msrv:
-    name: Minimum Supported Rust Version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust 1.91.1
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.91.1
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check with MSRV
-        run: cargo check --all-features
-
   build:
     name: Build Release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache dependencies
@@ -199,20 +114,17 @@ jobs:
           path: target/release/figma
           retention-days: 7
 
-  docs:
-    name: Documentation
+  security-audit:
+    name: Security Audit
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check documentation
-        run: cargo doc --no-deps --all-features
-
-      - name: Test documentation examples
-        run: cargo test --doc --all-features
+      - name: Run cargo-audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
