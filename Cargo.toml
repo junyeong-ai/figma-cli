@@ -24,7 +24,7 @@ exclude = [
 ]
 
 [[bin]]
-name = "figma"
+name = "figma-cli"
 path = "src/main.rs"
 
 [lib]

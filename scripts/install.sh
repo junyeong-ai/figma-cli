@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-readonly BINARY_NAME="figma"
+readonly BINARY_NAME="figma-cli"
 readonly REPO="junyeong-ai/figma-cli"
 readonly INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/figma-cli"  # Use XDG standard
@@ -427,8 +427,8 @@ main() {
     if "$INSTALL_DIR/$BINARY_NAME" --version &> /dev/null; then
         log_success "Installation complete! 🎉"
         echo
-        log_info "Run 'figma --help' to get started"
-        log_info "Run 'figma auth login' to set up authentication"
+        log_info "Run 'figma-cli --help' to get started"
+        log_info "Run 'figma-cli auth login' to set up authentication"
     else
         log_error "Installation verification failed"
         exit 1

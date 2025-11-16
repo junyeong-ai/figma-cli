@@ -60,16 +60,16 @@ jobs:
           target="${{ matrix.target }}"
 
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            binary="target/$target/release/figma.exe"
-            archive="figma-v${version}-${target}.zip"
-            cp "$binary" figma.exe
-            7z a "$archive" figma.exe
+            binary="target/$target/release/figma-cli.exe"
+            archive="figma-cli-v${version}-${target}.zip"
+            cp "$binary" figma-cli.exe
+            7z a "$archive" figma-cli.exe
             echo "ASSET=$archive" >> $GITHUB_ENV
           else
-            binary="target/$target/release/figma"
-            archive="figma-v${version}-${target}.tar.gz"
-            cp "$binary" figma
-            tar -czf "$archive" figma
+            binary="target/$target/release/figma-cli"
+            archive="figma-cli-v${version}-${target}.tar.gz"
+            cp "$binary" figma-cli
+            tar -czf "$archive" figma-cli
             echo "ASSET=$archive" >> $GITHUB_ENV
           fi
 

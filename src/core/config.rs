@@ -85,14 +85,11 @@ pub struct CacheConfig {
     pub path: Option<PathBuf>,
 }
 
-// Alias for backward compatibility
 pub use CacheConfig as Cache;
 pub use ExtractionConfig as Extraction;
 pub use HttpConfig as Http;
 pub use ImageConfig as Images;
 pub use PerformanceConfig as Performance;
-
-// Default values
 const fn default_depth() -> u32 {
     5
 }
@@ -139,7 +136,6 @@ const fn default_ttl() -> u64 {
     24
 }
 
-// Default implementations
 impl Default for ExtractionConfig {
     fn default() -> Self {
         Self {
@@ -271,7 +267,6 @@ impl Config {
             })
     }
 
-    /// Get config path (for compatibility)
     pub fn config_path() -> Option<PathBuf> {
         Self::default_config_path()
     }
@@ -284,7 +279,6 @@ impl Config {
         })
     }
 
-    /// Get cache directory (for compatibility)
     pub fn cache_dir() -> Option<PathBuf> {
         Self::default_cache_dir()
     }
@@ -358,7 +352,6 @@ impl Config {
         Ok(())
     }
 
-    // Compatibility accessors
     pub const fn extract(&self) -> &ExtractionConfig {
         &self.extraction
     }

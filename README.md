@@ -32,11 +32,11 @@ cargo build --release
 # 3. 토큰 설정
 export FIGMA_TOKEN="figd_..."
 # 또는
-figma auth login
+figma-cli auth login
 
 # 4. 사용 시작! 🎉
-figma extract <FILE_KEY>
-figma images <FILE_KEY> --node-ids 123:456
+figma-cli extract <FILE_KEY>
+figma-cli images <FILE_KEY> --node-ids 123:456
 ```
 
 **Tip**: Figma 토큰은 [Settings](https://www.figma.com/settings)에서 발급받을 수 있습니다.
@@ -48,77 +48,77 @@ figma images <FILE_KEY> --node-ids 123:456
 ### 디자인 추출
 ```bash
 # 전체 파일 추출
-figma extract ABC123XYZ456789012345678
+figma-cli extract ABC123XYZ456789012345678
 
 # URL에서 추출
-figma extract "https://www.figma.com/file/ABC123XYZ456789012345678/Design"
+figma-cli extract "https://www.figma.com/file/ABC123XYZ456789012345678/Design"
 
 # 깊이 제한으로 추출 (성능 최적화)
-figma extract <FILE_KEY> --depth 3
+figma-cli extract <FILE_KEY> --depth 3
 
 # 특정 페이지만 추출
-figma extract <FILE_KEY> --pages "Page 1,Page 2"
+figma-cli extract <FILE_KEY> --pages "Page 1,Page 2"
 
 # JSON 출력
-figma extract <FILE_KEY> --output design.json
+figma-cli extract <FILE_KEY> --output design.json
 ```
 
 ### 이미지 생성
 ```bash
 # 특정 노드 이미지 추출
-figma images <FILE_KEY> --node-ids "123:456,789:012"
+figma-cli images <FILE_KEY> --node-ids "123:456,789:012"
 
 # 고해상도 이미지 (2x, 3x)
-figma images <FILE_KEY> --node-ids 123:456 --scale 3
+figma-cli images <FILE_KEY> --node-ids 123:456 --scale 3
 
 # 다양한 포맷 지원
-figma images <FILE_KEY> --node-ids 123:456 --format svg
-figma images <FILE_KEY> --node-ids 123:456 --format pdf
+figma-cli images <FILE_KEY> --node-ids 123:456 --format svg
+figma-cli images <FILE_KEY> --node-ids 123:456 --format pdf
 
 # Base64 인코딩 (AI 에이전트용)
-figma images <FILE_KEY> --node-ids 123:456 --base64
+figma-cli images <FILE_KEY> --node-ids 123:456 --base64
 
 # 프레임 일괄 추출
-figma images <FILE_KEY> --frames "Frame 1,Frame 2"
+figma-cli images <FILE_KEY> --frames "Frame 1,Frame 2"
 ```
 
 ### 파일 검사
 ```bash
 # 파일 구조 확인
-figma inspect <FILE_KEY>
+figma-cli inspect <FILE_KEY>
 
 # 특정 깊이까지만 검사
-figma inspect <FILE_KEY> --depth 2
+figma-cli inspect <FILE_KEY> --depth 2
 
 # JSON 형식으로 출력
-figma inspect <FILE_KEY> --json | jq
+figma-cli inspect <FILE_KEY> --json | jq
 ```
 
 ### 인증 관리
 ```bash
 # 토큰 저장
-figma auth login
+figma-cli auth login
 
 # 토큰 확인
-figma auth test
+figma-cli auth test
 
 # 토큰 제거
-figma auth logout
+figma-cli auth logout
 ```
 
 ### 설정 관리
 ```bash
 # 설정 초기화
-figma config init
+figma-cli config init
 
 # 설정 확인
-figma config show
+figma-cli config show
 
 # JSON 형식으로 확인
-figma config show --json
+figma-cli config show --json
 
 # 설정 파일 편집
-figma config edit
+figma-cli config edit
 ```
 
 ---

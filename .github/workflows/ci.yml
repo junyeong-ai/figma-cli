@@ -104,14 +104,14 @@ jobs:
 
       - name: Check binary size
         run: |
-          ls -lh target/release/figma
-          du -h target/release/figma
+          ls -lh target/release/figma-cli
+          du -h target/release/figma-cli
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-binary
-          path: target/release/figma
+          path: target/release/figma-cli
           retention-days: 7
 
   security-audit:

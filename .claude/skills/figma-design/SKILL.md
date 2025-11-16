@@ -13,13 +13,13 @@ Extract designs, inspect nodes, and generate images from Figma files.
 
 ```bash
 # Check installation
-figma --version
+figma-cli --version
 
 # Authenticate (get token from https://www.figma.com/settings)
-figma auth login
+figma-cli auth login
 
 # Check config
-figma config show
+figma-cli config show
 ```
 
 ## Commands
@@ -28,17 +28,17 @@ figma config show
 
 ```bash
 # From URL (auto-parses file key)
-figma extract "https://www.figma.com/design/kAP6ItdoLNNJ7HLOWMnCUf/..."
+figma-cli extract "https://www.figma.com/design/kAP6ItdoLNNJ7HLOWMnCUf/..."
 
 # Filter by page
-figma extract FILE_KEY --pages "Page 1,Page 2"
-figma extract FILE_KEY --page-pattern ".*Mobile.*"
+figma-cli extract FILE_KEY --pages "Page 1,Page 2"
+figma-cli extract FILE_KEY --page-pattern ".*Mobile.*"
 
 # Control depth (default: 5)
-figma extract FILE_KEY --depth 3
+figma-cli extract FILE_KEY --depth 3
 
 # Output
-figma extract FILE_KEY --output design.json --pretty
+figma-cli extract FILE_KEY --output design.json --pretty
 ```
 
 **Returns**: JSON with metadata, structure, texts, and styles
@@ -47,13 +47,13 @@ figma extract FILE_KEY --output design.json --pretty
 
 ```bash
 # From URL (auto-extracts node-id)
-figma inspect "https://www.figma.com/design/FILE_KEY/?node-id=9845-142737"
+figma-cli inspect "https://www.figma.com/design/FILE_KEY/?node-id=9845-142737"
 
 # Multiple nodes
-figma inspect FILE_KEY --nodes "123:456,789:012" --depth 2
+figma-cli inspect FILE_KEY --nodes "123:456,789:012" --depth 2
 
 # Output
-figma inspect FILE_KEY --nodes "123:456" --output node.json --pretty
+figma-cli inspect FILE_KEY --nodes "123:456" --output node.json --pretty
 ```
 
 **Depth**: 0=node only, 1=with children, 2=with grandchildren
@@ -62,13 +62,13 @@ figma inspect FILE_KEY --nodes "123:456" --output node.json --pretty
 
 ```bash
 # URL mode (fast, returns S3 URLs)
-figma images FILE_KEY --frames "9845:142737"
+figma-cli images FILE_KEY --frames "9845:142737"
 
 # Base64 mode (for AI agents)
-figma images FILE_KEY --frames "9845:142737" --base64
+figma-cli images FILE_KEY --frames "9845:142737" --base64
 
 # Custom format and scale
-figma images FILE_KEY --frames "ID" --format svg --scale 3.0
+figma-cli images FILE_KEY --frames "ID" --format svg --scale 3.0
 ```
 
 **Formats**: png, jpg, svg, pdf
@@ -77,20 +77,20 @@ figma images FILE_KEY --frames "ID" --format svg --scale 3.0
 ### 4. Auth - Manage authentication
 
 ```bash
-figma auth login    # Store token
-figma auth test     # Validate token
-figma auth logout   # Remove token
+figma-cli auth login    # Store token
+figma-cli auth test     # Validate token
+figma-cli auth logout   # Remove token
 ```
 
 ### 5. Config - Manage settings
 
 ```bash
-figma config init           # Initialize config
-figma config show           # Display current settings
-figma config edit           # Edit with $EDITOR
-figma config path           # Show config file paths
-figma config get token      # Get specific value
-figma config set token "figd_..."  # Set specific value
+figma-cli config init           # Initialize config
+figma-cli config show           # Display current settings
+figma-cli config edit           # Edit with $EDITOR
+figma-cli config path           # Show config file paths
+figma-cli config get token      # Get specific value
+figma-cli config set token "figd_..."  # Set specific value
 ```
 
 ## Configuration
@@ -126,27 +126,27 @@ The CLI automatically handles Figma URLs:
 
 ### Extract entire design
 ```bash
-figma extract FILE_KEY --depth 5 --output design.json --pretty
+figma-cli extract FILE_KEY --depth 5 --output design.json --pretty
 ```
 
 ### Get specific frame for AI analysis
 ```bash
-figma images FILE_KEY --frames "9845:142737" --base64 --output frame.json
+figma-cli images FILE_KEY --frames "9845:142737" --base64 --output frame.json
 ```
 
 ### Inspect component structure
 ```bash
-figma inspect FILE_KEY --nodes "COMPONENT_ID" --depth 2 --pretty
+figma-cli inspect FILE_KEY --nodes "COMPONENT_ID" --depth 2 --pretty
 ```
 
 ### Batch process multiple frames
 ```bash
-figma images FILE_KEY --frames "ID1,ID2,ID3" --base64
+figma-cli images FILE_KEY --frames "ID1,ID2,ID3" --base64
 ```
 
 ## Error Handling
 
-- **No token**: Run `figma auth login`
+- **No token**: Run `figma-cli auth login`
 - **Invalid file key**: Check URL/key format
 - **Node not found**: Verify node ID exists
 - **Network errors**: Auto-retries 3 times with backoff

@@ -33,39 +33,39 @@ cd figma-cli
 
 ```bash
 # Set up token
-figma auth login
+figma-cli auth login
 # or
 export FIGMA_TOKEN="figd_your_token_here"
 
 # Initialize config
-figma config init
+figma-cli config init
 ```
 
 ### Basic Usage
 
 ```bash
 # Extract entire file
-figma extract https://www.figma.com/design/FILE_KEY/
+figma-cli extract https://www.figma.com/design/FILE_KEY/
 
 # Extract specific pages
-figma extract FILE_KEY --pages "Page 1,Page 2"
+figma-cli extract FILE_KEY --pages "Page 1,Page 2"
 
 # JSON output (pretty)
-figma extract FILE_KEY --pretty --output design.json
+figma-cli extract FILE_KEY --pretty --output design.json
 
 # Extract images (Base64)
-figma images FILE_KEY --frames "123:456,789:012" --base64
+figma-cli images FILE_KEY --frames "123:456,789:012" --base64
 ```
 
 ## 📖 Main Commands
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `extract` | Extract design content | `figma extract FILE_KEY` |
-| `inspect` | Inspect specific nodes | `figma inspect FILE_KEY --nodes "123:456"` |
-| `images` | Extract images | `figma images FILE_KEY --base64` |
-| `auth` | Manage authentication | `figma auth login` |
-| `config` | Manage configuration | `figma config show` |
+| `extract` | Extract design content | `figma-cli extract FILE_KEY` |
+| `inspect` | Inspect specific nodes | `figma-cli inspect FILE_KEY --nodes "123:456"` |
+| `images` | Extract images | `figma-cli images FILE_KEY --base64` |
+| `auth` | Manage authentication | `figma-cli auth login` |
+| `config` | Manage configuration | `figma-cli config show` |
 
 ## ⚙️ Configuration
 
@@ -96,18 +96,18 @@ base64_enabled = false
 
 ```bash
 # Extract only mobile-related pages
-figma extract FILE_KEY --page-pattern ".*Mobile.*"
+figma-cli extract FILE_KEY --page-pattern ".*Mobile.*"
 
 # Extract only component frames
-figma extract FILE_KEY --frame-pattern "^Component/.*"
+figma-cli extract FILE_KEY --frame-pattern "^Component/.*"
 ```
 
 ### AI Agent Integration
 
 ```bash
 # Extract with Base64 encoded images
-figma extract FILE_KEY --with-images --output design.json
-figma images FILE_KEY --base64 --output images.json
+figma-cli extract FILE_KEY --with-images --output design.json
+figma-cli images FILE_KEY --base64 --output images.json
 
 # Integrate with Claude or GPT
 cat design.json | your-ai-tool process
@@ -118,7 +118,7 @@ cat design.json | your-ai-tool process
 ```bash
 # Process multiple files
 for file_key in FILE1 FILE2 FILE3; do
-  figma extract $file_key --output "${file_key}.json"
+  figma-cli extract $file_key --output "${file_key}.json"
 done
 ```
 
