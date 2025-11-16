@@ -1,159 +1,169 @@
 ---
 name: figma-design
-version: 0.2.0
-description: Figma CLI for extracting designs, inspecting nodes, and generating images. Use for design documentation, UI analysis, component extraction, or AI-powered design review. Triggers - Figma files, design systems, UI screenshots, frame extraction.
+version: 0.1.0
+description: Figma CLI for extracting designs, querying data with JMESPath, and generating images. Automatic caching for instant repeated tasks.
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 
 # Figma CLI Expert
 
-Extract designs, inspect nodes, and generate images from Figma files.
+Extract designs, query with JMESPath, manage cache, generate images.
 
 ## Quick Start
 
 ```bash
-# Check installation
-figma-cli --version
-
-# Authenticate (get token from https://www.figma.com/settings)
-figma-cli auth login
-
-# Check config
-figma-cli config show
+figma-cli auth login        # Get token from https://www.figma.com/settings
+figma-cli config show       # Verify config
 ```
 
 ## Commands
 
-### 1. Extract - Get all text and structure
+### Extract
 
 ```bash
-# From URL (auto-parses file key)
-figma-cli extract "https://www.figma.com/design/kAP6ItdoLNNJ7HLOWMnCUf/..."
+# Basic (accepts URL or file key)
+figma-cli extract FILE_KEY --depth 3 --output design.json --pretty
 
-# Filter by page
+# Filtering
 figma-cli extract FILE_KEY --pages "Page 1,Page 2"
 figma-cli extract FILE_KEY --page-pattern ".*Mobile.*"
+figma-cli extract FILE_KEY --frame-pattern "^Component/.*"
 
-# Control depth (default: 5)
-figma-cli extract FILE_KEY --depth 3
+# Formats
+figma-cli extract FILE_KEY --format json --output design.json
+figma-cli extract FILE_KEY --format markdown --output design.md
+figma-cli extract FILE_KEY --format text
 
-# Output
-figma-cli extract FILE_KEY --output design.json --pretty
+# Options
+figma-cli extract FILE_KEY --with-images --image-dir ./images
+figma-cli extract FILE_KEY --include-hidden
 ```
 
-**Returns**: JSON with metadata, structure, texts, and styles
-
-### 2. Inspect - Get specific node details
+### Query
 
 ```bash
-# From URL (auto-extracts node-id)
+# JMESPath queries (automatic caching)
+figma-cli query FILE_KEY "name"
+figma-cli query FILE_KEY "document.children[*].name"
+figma-cli query FILE_KEY "document.children[?name=='Cover']"
+figma-cli query FILE_KEY "{fileName: name, version: version}" --pretty
+
+# Specific nodes
+figma-cli query FILE_KEY --nodes "30:71,0:1" "nodes"
+
+# Control depth
+figma-cli query FILE_KEY "name" --depth 3
+```
+
+### Inspect
+
+```bash
+# URL or node IDs
 figma-cli inspect "https://www.figma.com/design/FILE_KEY/?node-id=9845-142737"
-
-# Multiple nodes
 figma-cli inspect FILE_KEY --nodes "123:456,789:012" --depth 2
-
-# Output
-figma-cli inspect FILE_KEY --nodes "123:456" --output node.json --pretty
 ```
 
-**Depth**: 0=node only, 1=with children, 2=with grandchildren
-
-### 3. Images - Export frames
+### Images
 
 ```bash
-# URL mode (fast, returns S3 URLs)
+# URL mode (fast, S3 URLs)
 figma-cli images FILE_KEY --frames "9845:142737"
 
-# Base64 mode (for AI agents)
+# Base64 mode (for AI)
 figma-cli images FILE_KEY --frames "9845:142737" --base64
 
-# Custom format and scale
+# Options
 figma-cli images FILE_KEY --frames "ID" --format svg --scale 3.0
+figma-cli images FILE_KEY --frames "ID1,ID2,ID3" --base64
 ```
 
 **Formats**: png, jpg, svg, pdf
 **Scale**: 0.01 to 4.0 (default: 2.0)
 
-### 4. Auth - Manage authentication
+### Cache
 
 ```bash
-figma-cli auth login    # Store token
-figma-cli auth test     # Validate token
-figma-cli auth logout   # Remove token
+figma-cli cache stats                # Show statistics
+figma-cli cache list                 # List entries
+figma-cli cache list --json          # JSON format
+figma-cli cache clear --yes          # Clear all
 ```
 
-### 5. Config - Manage settings
+**Automatic caching** - all commands use cache transparently (no flags needed).
+
+### Auth & Config
 
 ```bash
-figma-cli config init           # Initialize config
-figma-cli config show           # Display current settings
-figma-cli config edit           # Edit with $EDITOR
-figma-cli config path           # Show config file paths
-figma-cli config get token      # Get specific value
-figma-cli config set token "figd_..."  # Set specific value
+# Auth
+figma-cli auth login
+figma-cli auth test
+figma-cli auth logout
+
+# Config
+figma-cli config init
+figma-cli config show
+figma-cli config edit
+figma-cli config get token
+figma-cli config set token "figd_..."
 ```
 
 ## Configuration
 
-Priority order (highest to lowest):
-1. CLI arguments (`--token`)
-2. Environment (`FIGMA_TOKEN`)
-3. Project config (`./figma-cli.toml`)
-4. Global config (`~/.config/figma-cli/config.toml`)
+Priority: CLI args > ENV (`FIGMA_TOKEN`) > Project config (`./figma-cli.toml`) > Global config (`~/.config/figma-cli/config.toml`)
 
-Example config:
 ```toml
 [auth]
 token = "figd_..."
 
-[extract]
-default_depth = 5
+[extraction]
+depth = 5
 
 [images]
-default_format = "png"
-default_scale = 2.0
-base64_enabled = false
+scale = 2.0
+format = "png"
+
+[cache]
+ttl = 24
+```
+
+## JMESPath Examples
+
+```bash
+# Metadata
+figma-cli query FILE_KEY "{fileName: name, version: version, pages: length(document.children)}"
+
+# All page names
+figma-cli query FILE_KEY "document.children[*].name"
+
+# Find by name
+figma-cli query FILE_KEY "document.children[?name=='MyPage']"
+
+# Slice and project
+figma-cli query FILE_KEY "document.children[0:3].{page: name, id: id}"
+
+# Count
+figma-cli query FILE_KEY "length(document.children)"
 ```
 
 ## URL Parsing
 
-The CLI automatically handles Figma URLs:
-- Extracts file keys from URLs
+Supports Figma URLs:
+- Extracts file keys automatically
 - Converts node-id format (9845-142737 → 9845:142737)
-- Supports both `/file/` and `/design/` URL formats
+- Works with `/file/` and `/design/` formats
 
-## Common Patterns
+## Common Tasks
 
-### Extract entire design
 ```bash
-figma-cli extract FILE_KEY --depth 5 --output design.json --pretty
-```
+# Extract with auto-cache
+figma-cli extract FILE_KEY --depth 5 -o design.json --pretty
 
-### Get specific frame for AI analysis
-```bash
-figma-cli images FILE_KEY --frames "9845:142737" --base64 --output frame.json
-```
+# Query metadata
+figma-cli query FILE_KEY "{name: name, version: version}" --depth 2
 
-### Inspect component structure
-```bash
+# Get frame as base64 for AI
+figma-cli images FILE_KEY --frames "9845:142737" --base64 -o frame.json
+
+# Inspect component
 figma-cli inspect FILE_KEY --nodes "COMPONENT_ID" --depth 2 --pretty
 ```
-
-### Batch process multiple frames
-```bash
-figma-cli images FILE_KEY --frames "ID1,ID2,ID3" --base64
-```
-
-## Error Handling
-
-- **No token**: Run `figma-cli auth login`
-- **Invalid file key**: Check URL/key format
-- **Node not found**: Verify node ID exists
-- **Network errors**: Auto-retries 3 times with backoff
-
-## Notes
-
-- Korean/Unicode text fully supported
-- Images: URL mode is fast, Base64 mode is slow but AI-compatible
-- Use `--pretty` for readable output during debugging
-- Depth affects memory usage - start with 3, increase if needed
