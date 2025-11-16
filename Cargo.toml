@@ -58,6 +58,7 @@ base64 = "0.22"
 url = "2.5"
 regex = "1.12"
 chrono = { version = "0.4", features = ["serde", "clock", "std"] }
+jmespath = "0.4"
 
 [dev-dependencies]
 wiremock = "0.6"
