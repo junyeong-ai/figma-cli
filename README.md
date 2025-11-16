@@ -1,263 +1,277 @@
 # Figma CLI
 
 [![CI](https://github.com/junyeong-ai/figma-cli/workflows/CI/badge.svg)](https://github.com/junyeong-ai/figma-cli/actions)
-[![Lint](https://github.com/junyeong-ai/figma-cli/workflows/Lint/badge.svg)](https://github.com/junyeong-ai/figma-cli/actions)
-[![Rust](https://img.shields.io/badge/rust-1.91.1%2B%20(2024%20edition)-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.91.1%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)](https://github.com/junyeong-ai/figma-cli/releases)
 
-> **🌐 한국어** | **[English](README.en.md)**
+> **🎨 Figma 디자인 추출 & 쿼리 CLI**
+
+**🌐 [English](README.en.md) | 한국어**
 
 ---
 
-> **🎨 고성능 Figma 디자인 추출 CLI**
->
-> - 🚀 **병렬 처리** (50개 동시 요청)
-> - 💾 **멀티레벨 캐시** (메모리 + 디스크)
-> - 🔍 **스트리밍 파싱** (대용량 파일 메모리 효율적 처리)
-> - 🛠️ **6개 명령어** (추출, 이미지, 검사, 인증, 설정)
+## ⚡ 핵심 기능
+
+- 🚀 **자동 캐싱** - 반복 작업 즉시 완료 (첫 실행 후 0ms)
+- 🔍 **JMESPath 쿼리** - 복잡한 데이터 탐색
+- 🖼️ **이미지 추출** - Base64 인코딩 지원
+- 📦 **다양한 포맷** - JSON, Markdown, Text 출력
+- ⚙️ **유연한 필터링** - 페이지, 프레임 패턴 매칭
 
 ---
 
-## ⚡ 빠른 시작 (1분)
+## 🚀 빠른 시작
+
+### 1. 설치
 
 ```bash
-# 1. 설치
 git clone https://github.com/junyeong-ai/figma-cli
 cd figma-cli
-cargo build --release
-
-# 2. 전역 설치 (선택사항)
 ./scripts/install.sh
-
-# 3. 토큰 설정
-export FIGMA_TOKEN="figd_..."
-# 또는
-figma-cli auth login
-
-# 4. 사용 시작! 🎉
-figma-cli extract <FILE_KEY>
-figma-cli images <FILE_KEY> --node-ids 123:456
 ```
 
-**Tip**: Figma 토큰은 [Settings](https://www.figma.com/settings)에서 발급받을 수 있습니다.
+### 2. 인증
+
+```bash
+figma-cli auth login
+```
+
+**토큰 발급**: [Figma Settings](https://www.figma.com/settings) → Personal Access Tokens
+
+### 3. 사용
+
+```bash
+figma-cli extract <FILE_KEY>
+figma-cli query <FILE_KEY> "name"
+figma-cli images <FILE_KEY> --frames "123:456"
+```
 
 ---
 
-## 🎯 주요 기능
+## 📖 명령어
 
-### 디자인 추출
+### `extract` - 디자인 추출
+
 ```bash
-# 전체 파일 추출
-figma-cli extract ABC123XYZ456789012345678
+# 기본 추출
+figma-cli extract <FILE_KEY>
 
-# URL에서 추출
-figma-cli extract "https://www.figma.com/file/ABC123XYZ456789012345678/Design"
+# URL 지원
+figma-cli extract "https://figma.com/file/<FILE_KEY>/Design"
 
-# 깊이 제한으로 추출 (성능 최적화)
-figma-cli extract <FILE_KEY> --depth 3
-
-# 특정 페이지만 추출
+# 페이지 필터링
 figma-cli extract <FILE_KEY> --pages "Page 1,Page 2"
+figma-cli extract <FILE_KEY> --page-pattern ".*Mobile.*"
 
-# JSON 출력
-figma-cli extract <FILE_KEY> --output design.json
+# 프레임 필터링
+figma-cli extract <FILE_KEY> --frame-pattern "^Component/.*"
+
+# 출력 포맷
+figma-cli extract <FILE_KEY> --format json --output design.json
+figma-cli extract <FILE_KEY> --format markdown --output design.md
+figma-cli extract <FILE_KEY> --format text
+
+# Pretty JSON
+figma-cli extract <FILE_KEY> --pretty
+
+# 이미지 포함
+figma-cli extract <FILE_KEY> --with-images --image-dir ./images
+
+# 숨겨진 노드 포함
+figma-cli extract <FILE_KEY> --include-hidden
 ```
 
-### 이미지 생성
+### `query` - JMESPath 쿼리
+
 ```bash
-# 특정 노드 이미지 추출
-figma-cli images <FILE_KEY> --node-ids "123:456,789:012"
+# 단순 필드
+figma-cli query <FILE_KEY> "name"
 
-# 고해상도 이미지 (2x, 3x)
-figma-cli images <FILE_KEY> --node-ids 123:456 --scale 3
+# 배열 프로젝션
+figma-cli query <FILE_KEY> "document.children[*].name"
 
-# 다양한 포맷 지원
-figma-cli images <FILE_KEY> --node-ids 123:456 --format svg
-figma-cli images <FILE_KEY> --node-ids 123:456 --format pdf
+# 필터링
+figma-cli query <FILE_KEY> "document.children[?name=='Cover']"
 
-# Base64 인코딩 (AI 에이전트용)
-figma-cli images <FILE_KEY> --node-ids 123:456 --base64
+# 복합 쿼리
+figma-cli query <FILE_KEY> "{fileName: name, version: version}" --pretty
 
-# 프레임 일괄 추출
-figma-cli images <FILE_KEY> --frames "Frame 1,Frame 2"
+# 특정 노드 쿼리
+figma-cli query <FILE_KEY> --nodes "30:71,0:1" "nodes"
+
+# 깊이 제한
+figma-cli query <FILE_KEY> "name" --depth 3
 ```
 
-### 파일 검사
+### `images` - 이미지 추출
+
 ```bash
-# 파일 구조 확인
+# 프레임 추출
+figma-cli images <FILE_KEY> --frames "123:456,789:012"
+
+# 포맷 지정
+figma-cli images <FILE_KEY> --frames "123:456" --format png
+figma-cli images <FILE_KEY> --frames "123:456" --format svg
+figma-cli images <FILE_KEY> --frames "123:456" --format pdf
+
+# 스케일 조정
+figma-cli images <FILE_KEY> --frames "123:456" --scale 2.0
+figma-cli images <FILE_KEY> --frames "123:456" --scale 3.0
+
+# Base64 인코딩
+figma-cli images <FILE_KEY> --frames "123:456" --base64
+
+# Pretty JSON 출력
+figma-cli images <FILE_KEY> --frames "123:456" --pretty
+```
+
+### `cache` - 캐시 관리
+
+```bash
+# 통계
+figma-cli cache stats
+
+# 목록
+figma-cli cache list
+figma-cli cache list --json
+
+# 삭제
+figma-cli cache clear --yes
+```
+
+### `inspect` - 파일 검사
+
+```bash
+# 기본 검사
 figma-cli inspect <FILE_KEY>
 
-# 특정 깊이까지만 검사
+# 깊이 제한
 figma-cli inspect <FILE_KEY> --depth 2
-
-# JSON 형식으로 출력
-figma-cli inspect <FILE_KEY> --json | jq
 ```
 
-### 인증 관리
+### `auth` - 인증
+
 ```bash
-# 토큰 저장
-figma-cli auth login
-
-# 토큰 확인
-figma-cli auth test
-
-# 토큰 제거
-figma-cli auth logout
+figma-cli auth login   # 토큰 저장
+figma-cli auth test    # 토큰 확인
+figma-cli auth logout  # 토큰 삭제
 ```
 
-### 설정 관리
+### `config` - 설정
+
 ```bash
-# 설정 초기화
-figma-cli config init
-
-# 설정 확인
-figma-cli config show
-
-# JSON 형식으로 확인
-figma-cli config show --json
-
-# 설정 파일 편집
-figma-cli config edit
+figma-cli config init  # 설정 초기화
+figma-cli config show  # 설정 확인
+figma-cli config edit  # 설정 편집
 ```
 
 ---
 
-## 🏗️ 아키텍처
+## 💡 활용 사례
 
-### Hexagonal Architecture (Ports & Adapters)
-```
-src/
-├── core/           # 핵심 도메인 (의존성 없음)
-│   ├── config.rs   # 설정 시스템
-│   ├── constants.rs # 상수 정의
-│   ├── errors.rs   # 에러 타입
-│   └── performance.rs # 캐시 & 병렬 처리
-├── client/         # API 클라이언트 (Adapter)
-│   ├── figma.rs    # Figma API
-│   ├── retry.rs    # 재시도 로직
-│   └── auth.rs     # 인증 관리
-├── service/        # 비즈니스 로직 (Port)
-│   ├── orchestrator.rs # 추출 조율
-│   └── traversal.rs    # 트리 순회
-└── cli/            # 사용자 인터페이스
-    ├── commands.rs # 명령어 핸들러
-    └── args.rs     # CLI 인자
-```
+### AI 에이전트
 
-### 성능 최적화
-- **Zero-Copy Streaming**: `Bytes`, `Arc<RawValue>` 사용
-- **Multi-Layer Cache**: L1 (메모리) + L2 (디스크)
-- **Parallel Processing**: Rayon 기반 work-stealing
-- **Link-Time Optimization**: LTO + strip으로 4.7MB 바이너리
-
----
-
-## 📦 설치
-
-### 소스에서 빌드
 ```bash
-git clone https://github.com/junyeong-ai/figma-cli
-cd figma-cli
-cargo build --release
+# 디자인 데이터 추출
+figma-cli extract <FILE_KEY> --output design.json
+
+# 이미지 Base64 추출
+figma-cli images <FILE_KEY> --frames "123:456" --base64 --output images.json
+
+# 쿼리로 필요한 데이터만 추출
+figma-cli query <FILE_KEY> "{pages: document.children[*].name, meta: {name, version}}"
 ```
 
-### 자동 설치 스크립트
-```bash
-curl -fsSL https://raw.githubusercontent.com/junyeong-ai/figma-cli/main/scripts/install.sh | bash
-```
+### 디자인 분석
 
-### Homebrew (macOS)
 ```bash
-brew tap junyeong-ai/figma-cli
-brew install figma-cli
+# 모든 페이지 이름
+figma-cli query <FILE_KEY> "document.children[*].name"
+
+# 특정 패턴 페이지 찾기
+figma-cli query <FILE_KEY> "document.children[?contains(name, 'Mobile')]"
+
+# 통계
+figma-cli query <FILE_KEY> "length(document.children)"
 ```
 
 ---
 
 ## ⚙️ 설정
 
-### 환경 변수
-```bash
-export FIGMA_TOKEN="figd_..."
-```
+### 우선순위
 
-### 설정 파일 (`~/.config/figma-cli/config.toml`)
+1. CLI 인자 (`--format json`)
+2. 환경 변수 (`FIGMA_TOKEN`)
+3. 프로젝트 설정 (`./figma-cli.toml`)
+4. 전역 설정 (`~/.config/figma-cli/config.toml`)
+
+### 설정 파일
+
+**위치**: `~/.config/figma-cli/config.toml`
+
 ```toml
 token = "figd_..."
 
 [extraction]
 depth = 5
-max_depth = 10
 styles = true
 components = true
-vectors = false
-
-[http]
-timeout = 30
-retries = 3
-retry_delay = 1000
 
 [images]
 scale = 2.0
 format = "png"
 
-[performance]
-concurrent = 50
-chunk_size = 100
-
 [cache]
 ttl = 24
+
+[http]
+timeout = 30
+retries = 3
 ```
 
 ---
 
-## 🔧 개발
+## 🎯 성능
+
+실제 테스트 결과 (파일 키: kAP6ItdoLNNJ7HLOWMnCUf, depth=2):
+
+| 작업 | 첫 실행 | 캐시 사용 |
+|------|---------|-----------|
+| Extract | 8754ms | 0ms |
+| Query | ~3000ms | 22ms |
+
+**캐시 위치**: `~/Library/Caches/figma-cli` (macOS)
+
+---
+
+## 🛠️ 개발
 
 ### 요구사항
+
 - Rust 1.91.1+ (2024 edition)
-- Cargo
 
-### 빌드
-```bash
-cargo build
-```
+### 빌드 & 테스트
 
-### 테스트
 ```bash
-cargo test --all
-```
-
-### 린팅
-```bash
-cargo fmt --all
-cargo clippy --all-targets --all-features
+cargo build --release
+cargo test
+cargo fmt
+cargo clippy
 ```
 
 ---
 
-## 📝 라이선스
+## 📄 라이선스
 
 MIT OR Apache-2.0
 
 ---
 
-## 🤝 기여
-
-이슈와 PR은 언제나 환영합니다!
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing`)
-5. Open a Pull Request
-
----
-
-## 📚 관련 문서
+## 📚 문서
 
 - [CLAUDE.md](CLAUDE.md) - AI 에이전트 개발 가이드
-- [Figma API Documentation](https://www.figma.com/developers/api)
+- [Figma API](https://www.figma.com/developers/api)
 
 ---
 

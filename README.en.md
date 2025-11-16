@@ -1,137 +1,278 @@
-# figma-cli
+# Figma CLI
 
 [![CI](https://github.com/junyeong-ai/figma-cli/workflows/CI/badge.svg)](https://github.com/junyeong-ai/figma-cli/actions)
-[![Lint](https://github.com/junyeong-ai/figma-cli/workflows/Lint/badge.svg)](https://github.com/junyeong-ai/figma-cli/actions)
-[![Rust](https://img.shields.io/badge/rust-1.91.1%2B%20(2024%20edition)-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.91.1%2B-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)](https://github.com/junyeong-ai/figma-cli/releases)
 
-Fast Figma CLI for design extraction and AI-powered analysis
+> **🎨 Figma Design Extraction & Query CLI**
 
-## ✨ Key Features
+**🌐 English | [한국어](README.md)**
 
-- **High-Speed Extraction**: 8x faster JSON parsing with Rust, 90% memory reduction
-- **AI-Friendly**: Perfect compatibility with AI agents via Base64 image encoding
-- **Flexible Filtering**: Regex filtering by pages and frames
-- **Multiple Outputs**: JSON, Text, Markdown format support
-- **Hierarchical Config**: Project → Global → Environment → CLI priority
+---
+
+## ⚡ Key Features
+
+- 🚀 **Automatic Caching** - Instant repeated tasks (0ms after first run)
+- 🔍 **JMESPath Queries** - Complex data exploration
+- 🖼️ **Image Extraction** - Base64 encoding support
+- 📦 **Multiple Formats** - JSON, Markdown, Text output
+- ⚙️ **Flexible Filtering** - Page and frame pattern matching
+
+---
 
 ## 🚀 Quick Start
 
-### Installation
+### 1. Installation
 
 ```bash
-# Cargo
-cargo install figma-cli
-
-# Build from source
 git clone https://github.com/junyeong-ai/figma-cli
 cd figma-cli
 ./scripts/install.sh
 ```
 
-### Configuration
+### 2. Authentication
 
 ```bash
-# Set up token
 figma-cli auth login
-# or
-export FIGMA_TOKEN="figd_your_token_here"
-
-# Initialize config
-figma-cli config init
 ```
 
-### Basic Usage
+**Get Token**: [Figma Settings](https://www.figma.com/settings) → Personal Access Tokens
+
+### 3. Usage
 
 ```bash
-# Extract entire file
-figma-cli extract https://www.figma.com/design/FILE_KEY/
-
-# Extract specific pages
-figma-cli extract FILE_KEY --pages "Page 1,Page 2"
-
-# JSON output (pretty)
-figma-cli extract FILE_KEY --pretty --output design.json
-
-# Extract images (Base64)
-figma-cli images FILE_KEY --frames "123:456,789:012" --base64
+figma-cli extract <FILE_KEY>
+figma-cli query <FILE_KEY> "name"
+figma-cli images <FILE_KEY> --frames "123:456"
 ```
 
-## 📖 Main Commands
+---
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `extract` | Extract design content | `figma-cli extract FILE_KEY` |
-| `inspect` | Inspect specific nodes | `figma-cli inspect FILE_KEY --nodes "123:456"` |
-| `images` | Extract images | `figma-cli images FILE_KEY --base64` |
-| `auth` | Manage authentication | `figma-cli auth login` |
-| `config` | Manage configuration | `figma-cli config show` |
+## 📖 Commands
+
+### `extract` - Design Extraction
+
+```bash
+# Basic extraction
+figma-cli extract <FILE_KEY>
+
+# URL support
+figma-cli extract "https://figma.com/file/<FILE_KEY>/Design"
+
+# Page filtering
+figma-cli extract <FILE_KEY> --pages "Page 1,Page 2"
+figma-cli extract <FILE_KEY> --page-pattern ".*Mobile.*"
+
+# Frame filtering
+figma-cli extract <FILE_KEY> --frame-pattern "^Component/.*"
+
+# Output formats
+figma-cli extract <FILE_KEY> --format json --output design.json
+figma-cli extract <FILE_KEY> --format markdown --output design.md
+figma-cli extract <FILE_KEY> --format text
+
+# Pretty JSON
+figma-cli extract <FILE_KEY> --pretty
+
+# Include images
+figma-cli extract <FILE_KEY> --with-images --image-dir ./images
+
+# Include hidden nodes
+figma-cli extract <FILE_KEY> --include-hidden
+```
+
+### `query` - JMESPath Queries
+
+```bash
+# Simple field
+figma-cli query <FILE_KEY> "name"
+
+# Array projection
+figma-cli query <FILE_KEY> "document.children[*].name"
+
+# Filtering
+figma-cli query <FILE_KEY> "document.children[?name=='Cover']"
+
+# Complex query
+figma-cli query <FILE_KEY> "{fileName: name, version: version}" --pretty
+
+# Specific node query
+figma-cli query <FILE_KEY> --nodes "30:71,0:1" "nodes"
+
+# Depth limiting
+figma-cli query <FILE_KEY> "name" --depth 3
+```
+
+### `images` - Image Extraction
+
+```bash
+# Extract frames
+figma-cli images <FILE_KEY> --frames "123:456,789:012"
+
+# Specify format
+figma-cli images <FILE_KEY> --frames "123:456" --format png
+figma-cli images <FILE_KEY> --frames "123:456" --format svg
+figma-cli images <FILE_KEY> --frames "123:456" --format pdf
+
+# Scale adjustment
+figma-cli images <FILE_KEY> --frames "123:456" --scale 2.0
+figma-cli images <FILE_KEY> --frames "123:456" --scale 3.0
+
+# Base64 encoding
+figma-cli images <FILE_KEY> --frames "123:456" --base64
+
+# Pretty JSON output
+figma-cli images <FILE_KEY> --frames "123:456" --pretty
+```
+
+### `cache` - Cache Management
+
+```bash
+# Statistics
+figma-cli cache stats
+
+# List entries
+figma-cli cache list
+figma-cli cache list --json
+
+# Clear cache
+figma-cli cache clear --yes
+```
+
+### `inspect` - File Inspection
+
+```bash
+# Basic inspection
+figma-cli inspect <FILE_KEY>
+
+# Depth limiting
+figma-cli inspect <FILE_KEY> --depth 2
+```
+
+### `auth` - Authentication
+
+```bash
+figma-cli auth login   # Save token
+figma-cli auth test    # Test token
+figma-cli auth logout  # Remove token
+```
+
+### `config` - Configuration
+
+```bash
+figma-cli config init  # Initialize config
+figma-cli config show  # Show config
+figma-cli config edit  # Edit config
+```
+
+---
+
+## 💡 Use Cases
+
+### AI Agents
+
+```bash
+# Extract design data
+figma-cli extract <FILE_KEY> --output design.json
+
+# Extract images with Base64
+figma-cli images <FILE_KEY> --frames "123:456" --base64 --output images.json
+
+# Extract only needed data with queries
+figma-cli query <FILE_KEY> "{pages: document.children[*].name, meta: {name, version}}"
+```
+
+### Design Analysis
+
+```bash
+# Get all page names
+figma-cli query <FILE_KEY> "document.children[*].name"
+
+# Find pages matching pattern
+figma-cli query <FILE_KEY> "document.children[?contains(name, 'Mobile')]"
+
+# Statistics
+figma-cli query <FILE_KEY> "length(document.children)"
+```
+
+---
 
 ## ⚙️ Configuration
 
-Configuration priority:
-1. CLI arguments (`--token`)
+### Priority Order
+
+1. CLI arguments (`--format json`)
 2. Environment variables (`FIGMA_TOKEN`)
 3. Project config (`./figma-cli.toml`)
 4. Global config (`~/.config/figma-cli/config.toml`)
 
-Example config file:
+### Config File
+
+**Location**: `~/.config/figma-cli/config.toml`
 
 ```toml
-[auth]
-token = "figd_your_token_here"
+token = "figd_..."
 
-[extract]
-default_depth = 5
+[extraction]
+depth = 5
+styles = true
+components = true
 
 [images]
-default_format = "png"
-default_scale = 2.0
-base64_enabled = false
+scale = 2.0
+format = "png"
+
+[cache]
+ttl = 24
+
+[http]
+timeout = 30
+retries = 3
 ```
 
-## 💡 Advanced Usage
+---
 
-### Regex Filtering
+## 🎯 Performance
+
+Actual test results (File key: kAP6ItdoLNNJ7HLOWMnCUf, depth=2):
+
+| Operation | First Run | Cached |
+|-----------|-----------|--------|
+| Extract | 8754ms | 0ms |
+| Query | ~3000ms | 22ms |
+
+**Cache Location**: `~/Library/Caches/figma-cli` (macOS)
+
+---
+
+## 🛠️ Development
+
+### Requirements
+
+- Rust 1.91.1+ (2024 edition)
+
+### Build & Test
 
 ```bash
-# Extract only mobile-related pages
-figma-cli extract FILE_KEY --page-pattern ".*Mobile.*"
-
-# Extract only component frames
-figma-cli extract FILE_KEY --frame-pattern "^Component/.*"
+cargo build --release
+cargo test
+cargo fmt
+cargo clippy
 ```
 
-### AI Agent Integration
-
-```bash
-# Extract with Base64 encoded images
-figma-cli extract FILE_KEY --with-images --output design.json
-figma-cli images FILE_KEY --base64 --output images.json
-
-# Integrate with Claude or GPT
-cat design.json | your-ai-tool process
-```
-
-### Batch Processing
-
-```bash
-# Process multiple files
-for file_key in FILE1 FILE2 FILE3; do
-  figma-cli extract $file_key --output "${file_key}.json"
-done
-```
-
-## 🤝 Contributing
-
-To contribute to this project:
-
-1. Fork & Clone
-2. Create branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push (`git push origin feature/amazing-feature`)
-5. Create Pull Request
+---
 
 ## 📄 License
 
-MIT
+MIT OR Apache-2.0
+
+---
+
+## 📚 Documentation
+
+- [CLAUDE.md](CLAUDE.md) - AI Agent Developer Guide
+- [Figma API](https://www.figma.com/developers/api)
+
+---
+
+**Made with ❤️ and Rust**
