@@ -1,89 +1,134 @@
 # figma-cli - AI Agent Developer Guide
 
-Essential knowledge for implementing features and debugging this Rust CLI tool.
+Essential implementation knowledge for this Rust Figma CLI.
 
 ---
 
-## Core Patterns
+## Architecture
 
-### Untagged Enum with Generic Option<Struct> Deserializer
+```
+src/
+├── core/              # Domain logic (zero dependencies)
+│   ├── cache.rs       # BLAKE3-hashed cache (RwLock + HashMap)
+│   ├── query.rs       # JMESPath query engine
+│   ├── config.rs      # Hierarchical config system
+│   └── errors.rs      # Error types
+├── client/            # HTTP adapter
+│   ├── figma.rs       # API client with auto-caching
+│   └── retry.rs       # Exponential backoff
+├── service/           # Business logic
+│   ├── orchestrator.rs  # Extraction coordinator
+│   └── traversal.rs     # Visitor pattern tree traversal
+├── cli/               # User interface
+│   ├── commands.rs    # Command handlers
+│   └── args.rs        # CLI arguments (clap)
+└── models/            # Data structures
+    └── document.rs    # Figma API response types
+```
 
-**Problem**: Serde's internally tagged enum (`#[serde(tag = "type")]`) cannot handle `Option<Struct>` fields due to deserialization limitations.
+**Key Design**: Hexagonal architecture - `core/` has zero dependencies on outer layers. All I/O happens through `client/` and `cli/` adapters.
 
-**Implementation**:
+---
+
+## Critical Implementation Patterns
+
+### 1. Serde Untagged Enum for Figma Nodes
+
+**Why**: Figma's `Option<Color>`, `Option<BoundingBox>` fields fail with internally tagged enums
+
+**Location**: `src/models/document.rs:53-618`
+
 ```rust
-// Node enum with untagged pattern
-#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Node {
     Canvas {
-        #[serde(rename = "type")]
-        node_type: String,
-        id: String,
-        name: String,
-        #[serde(
-            rename = "backgroundColor",
-            default,
-            skip_serializing_if = "Option::is_none",
-            with = "option_struct"
-        )]
+        #[serde(with = "option_struct")]
         background_color: Option<Color>,
-        children: Vec<Node>,
+        // ...
     },
-    // 18 more variants...
 }
 
-// Generic helper for deserializing Option<T: DeserializeOwned>
 mod option_struct {
-    use serde::de::DeserializeOwned;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: Serialize,
-    {
-        value.serialize(serializer)
-    }
-
-    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
-    where
-        D: Deserializer<'de>,
-        T: DeserializeOwned,
-    {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        if value.is_null() {
-            return Ok(None);
-        }
-        Ok(Some(serde_json::from_value(value).map_err(serde::de::Error::custom)?))
+    pub fn deserialize<'de, D, T>(d: D) -> Result<Option<T>, D::Error> {
+        let v = Value::deserialize(d)?;
+        Ok(if v.is_null() { None } else { Some(from_value(v)?) })
     }
 }
 ```
 
-**Why**: Allows complex nested Figma document structures with optional struct fields. Internally tagged enums fail with `invalid type: map, expected f64` errors when deserializing `Option<Color>`, `Option<BoundingBox>`, etc.
+**Critical**: Don't change to `#[serde(tag = "type")]` - it breaks `Option<Struct>` deserialization.
 
-**Applied to**: All 19 Node variants with `Option<Color>`, `Option<BoundingBox>`, `Option<TypeStyle>` fields.
+### 2. Cache System
 
-**Location**: `src/models/document.rs` lines 53-618
+**Files**: `src/core/cache.rs`, `src/client/figma.rs:99-120`
 
----
+**Design**:
+- Hash: `BLAKE3(file_key + depth)` for cache keys
+- Index: `Arc<RwLock<HashMap<String, CacheMetadata>>>` for O(1) lookups
+- Storage: JSON files in `~/Library/Caches/figma-cli/`
+- TTL: 24h default (configurable)
+- Separation: File cache vs node cache (different endpoints)
 
-### Hierarchical Path Tracking
-
-**Implementation**:
+**Auto-caching integration**:
 ```rust
+// In FigmaClient::get_file()
+if let Some(cache) = &self.cache
+    && let Ok(Some(cached)) = cache.get_file(key, depth) {
+    return Ok(cached);  // Cache hit
+}
+let file = self.http_get(...).await?;  // API call
+if let Some(cache) = &self.cache {
+    cache.put_file(&file, depth)?;  // Populate
+}
+Ok(file)
+```
+
+**Critical Lock Pattern** (`src/core/cache.rs:245-263`):
+```rust
+fn update_access_time(&self, key: &str) -> Result<()> {
+    {
+        // Acquire write lock in block scope
+        if let Some(meta) = self.index.write().get_mut(key) {
+            meta.accessed_at = Utc::now();
+        }
+    } // Lock released here
+    self.save_index()?;  // Now safe to acquire read lock
+    Ok(())
+}
+```
+
+**Why**: Calling `save_index()` while holding write lock → deadlock (read lock attempt while write-locked).
+
+### 3. Query Engine (JMESPath)
+
+**Location**: `src/core/query.rs`
+
+**Critical**: Use `serde_json::to_value(n)` for Number conversion
+```rust
+jmespath::Variable::Number(n) => serde_json::to_value(n)
+    .map_err(|e| Error::other(format!("Failed to convert: {e}"))),
+```
+
+**Why**: JMESPath's `Number` type doesn't directly map to `serde_json::Number`.
+
+### 4. Visitor Pattern for Traversal
+
+**Location**: `src/service/traversal.rs:19-43`
+
+**Why**: Decouples traversal from extraction logic. Add new extractors without modifying traversal.
+
+```rust
+pub trait NodeVisitor {
+    fn visit_node(&mut self, node: &Node, depth: usize, path: &[String]);
+}
+
 pub fn traverse_node<V: NodeVisitor>(
-    node: &Node,
-    visitor: &mut V,
-    depth: usize,
-    path: &mut Vec<String>,
+    node: &Node, visitor: &mut V, depth: usize, path: &mut Vec<String>
 ) {
     visitor.visit_node(node, depth, path);
-
-    let children = get_children(node);
-    if !children.is_empty() {
+    if !get_children(node).is_empty() {
         path.push(get_node_name(node).to_string());
-        for child in children {
+        for child in get_children(node) {
             traverse_node(child, visitor, depth + 1, path);
         }
         path.pop();
@@ -91,156 +136,48 @@ pub fn traverse_node<V: NodeVisitor>(
 }
 ```
 
-**Why**: Maintains hierarchical context during tree traversal. Path structure: `[Document, Canvas, Frame, ...]` enables text extraction with full location context (`Page > Frame > Group > Text`).
-
-**Pattern**: Pass `&mut Vec<String>` through recursion, pushing node names before descending, popping after visiting all children.
-
-**Location**: `src/service/traversal.rs` lines 19-43
-
 ---
 
-### Visitor Pattern with Path Context
+## Common Development Tasks
 
-**Implementation**:
-```rust
-pub trait NodeVisitor {
-    fn visit_node(&mut self, node: &Node, depth: usize, path: &[String]);
-}
+### Add New Command
 
-impl NodeVisitor for TextExtractor {
-    fn visit_node(&mut self, node: &Node, _depth: usize, path: &[String]) {
-        if let Node::Text { id, characters, .. } = node {
-            let hierarchy = build_hierarchy_path(path);
-            self.texts.push(ExtractedText {
-                node_id: id.clone(),
-                text: characters.clone(),
-                path: hierarchy,
-                sequence_number: self.sequence_number,
-            });
-            self.sequence_number += 1;
-        }
-    }
-}
-```
-
-**Why**: Decouples traversal from extraction logic. Adding new extractors (images, components, styles) requires only implementing `NodeVisitor` trait, no changes to traversal code.
-
-**Location**: `src/service/traversal.rs` lines 6-8, `src/extractor/text.rs` lines 36-76
-
----
-
-## Development Tasks
+1. `src/cli/args.rs`: Add variant to `Commands` enum + args struct
+2. `src/cli/commands.rs`: Implement `pub async fn handle_*()` function
+3. `src/cli/mod.rs`: Add to `pub use commands::{...};`
+4. `src/main.rs`: Add match arm in `main()`
 
 ### Add New API Endpoint
 
-1. Define types in `src/models/document.rs`
-2. Add method to `src/client/figma.rs`
-3. Add command handler in `src/cli/commands.rs`
-4. Update CLI args in `src/cli/args.rs`
-5. Add test in `tests/integration_tests.rs`
+1. `src/models/document.rs`: Define response types
+2. `src/client/figma.rs`: Add method to `FigmaClient`
+3. Integrate caching: check cache → API call → populate cache
 
-### Add New Output Format
+### Add New Visitor (Extractor)
 
-1. Add variant to `OutputFormat` in `src/cli/args.rs`
-2. Implement formatter in `src/cli/output.rs`
-3. Update `format_output` match statement
-4. Add test case with sample data
-
-### Add Configuration Field
-
-1. Add field to struct in `src/core/config.rs`
-2. Update `Default` implementation
-3. Add validation in `validate()` method
-4. Update merge logic if needed
-5. Document in README.md config section
+1. Create struct in `src/extractor/`
+2. Implement `NodeVisitor` trait
+3. Use `traverse_node()` with your visitor
 
 ---
 
-## Common Issues
+## File Locations
 
-### Issue: Token Not Found
-
-**Symptom**: "No authentication token found" error
-
-**Check**:
-```bash
-figma auth test
-cat ~/.config/figma-cli/config.json
-echo $FIGMA_TOKEN
-```
-
-**Fix**:
-```bash
-figma auth login
-# or
-export FIGMA_TOKEN="figd_..."
-```
-
----
-
-### Issue: Rate Limit Exceeded
-
-**Symptom**: 429 errors, "Rate limit exceeded" messages
-
-**Check**: Look for retry_after header in error response
-
-**Fix**: Automatic retry with backoff is implemented. For persistent issues:
-- Reduce `max_concurrent` in extract command
-- Increase retry delays in `src/client/retry.rs`
-
----
-
-### Issue: Large File Memory Usage
-
-**Symptom**: High memory usage, potential OOM
-
-**Check**:
-```bash
-figma extract FILE_KEY --depth 1  # Limit depth first
-```
-
-**Fix**:
-- Use depth limiting (`--depth`)
-- Filter by specific pages (`--pages`)
-- Enable streaming mode (future feature)
-
----
-
-## Key Constants
-
-**Locations**:
-- `src/core/config.rs`: default configurations
-- `src/client/retry.rs`: retry behavior (max_retries, backoff)
-- `src/client/figma.rs`: API constants (TIMEOUT, API_BASE)
-- `src/core/performance.rs`: concurrency and caching settings
-
-**To modify**: Edit constant or add to `Config` struct for runtime configuration
+- **Config**: `~/.config/figma-cli/config.toml`
+- **Cache**: `~/Library/Caches/figma-cli/` (macOS), `~/.cache/figma-cli/` (Linux)
+- **Binary**: `~/.local/bin/figma-cli` or `~/.cargo/bin/figma-cli`
 
 ---
 
 ## Testing
 
-### Run All Tests
 ```bash
-cargo test
-```
-
-### Run Specific Test Module
-```bash
-cargo test client::
-cargo test -- --nocapture  # See println! output
-```
-
-### Test Coverage
-```bash
-cargo llvm-cov test
-```
-
-### Integration Test with Real File
-```bash
-FIGMA_TOKEN=figd_xxx cargo run -- extract FILE_KEY --output test.json
+cargo test                    # All tests (42 total)
+cargo test cache::            # Cache module
+cargo test query::            # Query module
+FIGMA_TOKEN=xxx cargo run -- extract FILE_KEY
 ```
 
 ---
 
-This guide contains only implementation-critical knowledge. For user docs, see [README.md](README.md).
+End of guide. See [README.md](README.md) for user documentation.
