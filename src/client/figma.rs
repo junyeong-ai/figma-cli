@@ -2,9 +2,11 @@
 
 use crate::client::error::Result;
 use crate::client::retry::{RetryConfig, retry_with_backoff};
+use crate::core::cache::Cache;
 use crate::core::errors::Error;
 use crate::models::document::FigmaFile;
 use reqwest::Client as HttpClient;
+use std::sync::Arc;
 use std::time::Duration;
 
 const FIGMA_API_BASE: &str = "https://api.figma.com/v1";
@@ -14,6 +16,7 @@ pub struct FigmaClient {
     client: HttpClient,
     token: String,
     retry_config: RetryConfig,
+    cache: Option<Arc<Cache>>,
 }
 
 impl FigmaClient {
@@ -28,12 +31,19 @@ impl FigmaClient {
             client,
             token,
             retry_config: RetryConfig::default(),
+            cache: None,
         })
     }
 
     /// Create client with custom retry configuration
     pub const fn with_retry_config(mut self, config: RetryConfig) -> Self {
         self.retry_config = config;
+        self
+    }
+
+    /// Enable caching with the given cache instance
+    pub fn with_cache(mut self, cache: Arc<Cache>) -> Self {
+        self.cache = Some(cache);
         self
     }
 
@@ -83,6 +93,13 @@ impl FigmaClient {
 
     /// Get a Figma file by key with optional depth parameter
     pub async fn get_file(&self, file_key: &str, depth: Option<u32>) -> Result<FigmaFile> {
+        if let Some(cache) = &self.cache
+            && let Ok(Some(cached)) = cache.get_file(file_key, depth)
+        {
+            tracing::info!("Cache hit for file: {} (depth: {:?})", file_key, depth);
+            return Ok(cached);
+        }
+
         let url = format!("{FIGMA_API_BASE}/files/{file_key}");
 
         tracing::info!("Fetching file: {} (depth: {:?})", file_key, depth);
@@ -136,6 +153,10 @@ impl FigmaClient {
             file.version
         );
 
+        if let Some(cache) = &self.cache {
+            let _ = cache.put_file(&file, depth);
+        }
+
         Ok(file)
     }
 
@@ -146,6 +167,18 @@ impl FigmaClient {
         node_ids: &[String],
         depth: Option<u32>,
     ) -> Result<NodesResponse> {
+        if let Some(cache) = &self.cache
+            && let Ok(Some(cached)) = cache.get_nodes(file_key, node_ids, depth)
+        {
+            tracing::info!(
+                "Cache hit for {} nodes from file: {}",
+                node_ids.len(),
+                file_key
+            );
+            return serde_json::from_value(cached)
+                .map_err(|e| Error::parse(format!("Cache deserialization failed: {e}")));
+        }
+
         let url = format!("{FIGMA_API_BASE}/files/{file_key}/nodes");
         let ids = node_ids.join(",");
 
@@ -176,10 +209,18 @@ impl FigmaClient {
             return Err(self.handle_error_response(response).await);
         }
 
-        response
+        let nodes_response = response
             .json::<NodesResponse>()
             .await
-            .map_err(|e| Error::parse(format!("Failed to parse nodes response: {e}")))
+            .map_err(|e| Error::parse(format!("Failed to parse nodes response: {e}")))?;
+
+        if let Some(cache) = &self.cache
+            && let Ok(value) = serde_json::to_value(&nodes_response)
+        {
+            let _ = cache.put_nodes(file_key, node_ids, depth, &value);
+        }
+
+        Ok(nodes_response)
     }
 
     /// Get image URLs for specific nodes
