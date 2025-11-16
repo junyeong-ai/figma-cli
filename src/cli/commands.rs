@@ -1,29 +1,36 @@
 //! Command handlers
 
-use crate::cli::args::{AuthCommand, ConfigCommand, ExtractArgs, ImagesArgs, InspectArgs};
+use crate::cli::args::{
+    AuthCommand, CacheCommand, ConfigCommand, ExtractArgs, ImagesArgs, InspectArgs, QueryArgs,
+};
 use crate::cli::output::format_output;
 use crate::client::{FigmaClient, TokenManager};
-use crate::core::Config;
+use crate::core::{Cache, Config, QueryEngine};
 use crate::models::config::FilterCriteria;
 use crate::service::Orchestrator;
 use anyhow::{Context, Result};
 use std::io::{self, Write};
+use std::sync::Arc;
 
 /// Handle extract command
 pub async fn handle_extract(args: ExtractArgs) -> Result<()> {
-    // Parse file key
     let file_key = args
         .parse_file_key()
         .map_err(|e| anyhow::anyhow!("Failed to parse file key: {e}"))?;
 
     tracing::info!("Extracting from file: {}", file_key);
 
-    // Get token
-    let token = TokenManager::get()?
+    let config = Config::load()?;
+    let token = config
+        .token
+        .clone()
+        .or_else(|| TokenManager::get().ok().flatten())
         .context("No authentication token found. Run 'figma-cli auth login' first")?;
 
-    // Create client
-    let client = FigmaClient::new(token)?;
+    let cache_dir = config.cache_path();
+    let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
+
+    let client = FigmaClient::new(token)?.with_cache(cache);
 
     // Create progress spinner
 
@@ -600,15 +607,16 @@ pub async fn handle_inspect(args: InspectArgs) -> Result<()> {
         Config::load()?
     };
 
-    // Get token
     let token = config
         .token
         .clone()
         .or_else(|| TokenManager::get().ok().flatten())
         .context("No authentication token found. Run 'figma-cli auth login' first")?;
 
-    // Create client
-    let client = FigmaClient::new(token)?;
+    let cache_dir = config.cache_path();
+    let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
+
+    let client = FigmaClient::new(token)?.with_cache(cache);
 
     // Create progress spinner
 
@@ -741,6 +749,139 @@ pub async fn handle_images(args: ImagesArgs) -> Result<()> {
         println!("  Format: {}", if args.base64 { "base64" } else { "url" });
     } else {
         println!("{output_str}");
+    }
+
+    Ok(())
+}
+
+pub async fn handle_query(args: QueryArgs) -> Result<()> {
+    let (file_key, url_node_ids) = crate::utils::parse_file_and_nodes_from_url(&args.file)
+        .map_err(|e| anyhow::anyhow!("Failed to parse file/node IDs: {e}"))?;
+
+    let config = if let Some(config_path) = args.config {
+        Config::load_from(&config_path)?
+    } else {
+        Config::load()?
+    };
+
+    let token = config
+        .token
+        .clone()
+        .or_else(|| TokenManager::get().ok().flatten())
+        .context("No authentication token found. Run 'figma-cli auth login' first")?;
+
+    let cache_dir = config.cache_path();
+    let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
+
+    let client = FigmaClient::new(token)?.with_cache(cache);
+
+    let data = if let Some(node_ids) = args.nodes.as_ref().or(Some(&url_node_ids)) {
+        if !node_ids.is_empty() {
+            let response = client
+                .get_nodes(&file_key, node_ids, args.depth)
+                .await
+                .context("Failed to fetch nodes")?;
+            serde_json::to_value(&response)?
+        } else {
+            let file = client
+                .get_file(&file_key, args.depth)
+                .await
+                .context("Failed to fetch file")?;
+            serde_json::to_value(&file)?
+        }
+    } else {
+        let file = client
+            .get_file(&file_key, args.depth)
+            .await
+            .context("Failed to fetch file")?;
+        serde_json::to_value(&file)?
+    };
+
+    let result = QueryEngine::apply(&args.query, &data)?;
+
+    let output_str = if args.pretty {
+        serde_json::to_string_pretty(&result)?
+    } else {
+        serde_json::to_string(&result)?
+    };
+
+    if let Some(output_path) = args.output {
+        std::fs::write(&output_path, output_str)?;
+        println!();
+        println!("✓ Query executed");
+        println!("  File: {output_path}");
+    } else {
+        println!("{output_str}");
+    }
+
+    Ok(())
+}
+
+pub async fn handle_cache(command: CacheCommand) -> Result<()> {
+    let config = Config::load()?;
+    let cache_dir = config.cache_path();
+    let cache = Cache::new(cache_dir.clone(), config.cache.ttl)?;
+
+    match command {
+        CacheCommand::Stats => {
+            let stats = cache.stats();
+            println!();
+            println!("Cache Statistics:");
+            println!("  Entries: {}", stats.total_entries);
+            println!("  Size: {:.2}MB", stats.total_size as f64 / 1024.0 / 1024.0);
+            println!("  Expired: {}", stats.expired_entries);
+            println!("  TTL: {}h", stats.ttl_hours);
+            println!("  Path: {}", cache_dir.display());
+            println!();
+        }
+
+        CacheCommand::List { json } => {
+            let entries = cache.list();
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&entries)?);
+            } else {
+                if entries.is_empty() {
+                    println!();
+                    println!("No cache entries");
+                    println!();
+                    return Ok(());
+                }
+
+                println!();
+                println!("Cache Entries:");
+                println!();
+                for (i, entry) in entries.iter().enumerate() {
+                    println!("  {}. File: {}", i + 1, entry.file_key);
+                    println!("     Version: {}", entry.version);
+                    println!("     Depth: {:?}", entry.depth);
+                    println!("     Size: {:.2}KB", entry.size as f64 / 1024.0);
+                    println!("     Created: {}", entry.created_at);
+                    println!("     Accessed: {}", entry.accessed_at);
+                    println!();
+                }
+            }
+        }
+
+        CacheCommand::Clear { yes } => {
+            if !yes {
+                print!("Clear all cache entries? [y/N]: ");
+                std::io::Write::flush(&mut std::io::stdout())?;
+
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+
+                if !input.trim().eq_ignore_ascii_case("y") {
+                    println!("Aborted.");
+                    return Ok(());
+                }
+            }
+
+            cache.clear()?;
+            println!();
+            println!("✓ Cache cleared");
+            println!();
+        }
     }
 
     Ok(())

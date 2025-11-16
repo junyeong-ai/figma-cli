@@ -26,6 +26,12 @@ pub enum Commands {
     /// Get images with optional base64 encoding
     Images(ImagesArgs),
 
+    /// Query Figma data using JMESPath
+    Query(QueryArgs),
+
+    /// Manage cache
+    Cache(CacheArgs),
+
     /// Manage authentication
     Auth(AuthArgs),
 
@@ -182,6 +188,63 @@ pub enum AuthCommand {
 
     /// Logout (remove stored token)
     Logout,
+}
+
+#[derive(Parser, Debug)]
+pub struct QueryArgs {
+    /// Figma file URL or key (supports node-id in URL)
+    #[arg(value_name = "FILE")]
+    pub file: String,
+
+    /// JMESPath query expression
+    #[arg(value_name = "QUERY")]
+    pub query: String,
+
+    /// Node IDs to query (comma-separated, applies query to specific nodes)
+    #[arg(long, value_delimiter = ',')]
+    pub nodes: Option<Vec<String>>,
+
+    /// Depth of tree traversal
+    #[arg(long)]
+    pub depth: Option<u32>,
+
+    /// Output file path (default: stdout)
+    #[arg(short, long)]
+    pub output: Option<String>,
+
+    /// Pretty print JSON output
+    #[arg(long)]
+    pub pretty: bool,
+
+    /// Config file path
+    #[arg(short = 'c', long)]
+    pub config: Option<String>,
+}
+
+#[derive(Parser, Debug)]
+pub struct CacheArgs {
+    #[command(subcommand)]
+    pub command: CacheCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CacheCommand {
+    /// Show cache statistics
+    Stats,
+
+    /// List cache entries
+    List {
+        /// Output in JSON format
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Clear all cache entries
+    Clear {
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        yes: bool,
+    },
 }
 
 #[derive(Parser, Debug)]

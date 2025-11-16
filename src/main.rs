@@ -3,7 +3,10 @@
 use anyhow::Result;
 use clap::Parser;
 use figma_cli::cli::{Cli, Commands};
-use figma_cli::cli::{handle_auth, handle_config, handle_extract, handle_images, handle_inspect};
+use figma_cli::cli::{
+    handle_auth, handle_cache, handle_config, handle_extract, handle_images, handle_inspect,
+    handle_query,
+};
 
 fn init_logging(verbose: bool) {
     use tracing_subscriber::{EnvFilter, fmt};
@@ -27,6 +30,8 @@ async fn main() -> Result<()> {
         Commands::Extract(args) => handle_extract(args).await,
         Commands::Inspect(args) => handle_inspect(args).await,
         Commands::Images(args) => handle_images(args).await,
+        Commands::Query(args) => handle_query(args).await,
+        Commands::Cache(args) => handle_cache(args.command).await,
         Commands::Auth(args) => handle_auth(args.command).await,
         Commands::Config(args) => handle_config(args.command).await,
     }
