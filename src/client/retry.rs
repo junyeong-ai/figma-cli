@@ -5,7 +5,7 @@ use crate::core::errors::Error;
 use std::time::Duration;
 use tokio::time::sleep;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct RetryConfig {
     pub max_retries: u32,
     pub base_delay_ms: u64,

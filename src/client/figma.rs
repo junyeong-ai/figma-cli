@@ -65,7 +65,7 @@ impl FigmaClient {
                     .await
                     .map_err(|e| Error::network(format!("Request failed: {e}")))
             },
-            self.retry_config.clone(),
+            self.retry_config,
         )
         .await?;
 
@@ -121,7 +121,7 @@ impl FigmaClient {
                     .await
                     .map_err(|e| Error::network(format!("Request failed: {e}")))
             },
-            self.retry_config.clone(),
+            self.retry_config,
         )
         .await?;
 
@@ -201,7 +201,7 @@ impl FigmaClient {
                     .await
                     .map_err(|e| Error::network(format!("Request failed: {e}")))
             },
-            self.retry_config.clone(),
+            self.retry_config,
         )
         .await?;
 
@@ -250,7 +250,7 @@ impl FigmaClient {
                     .await
                     .map_err(|e| Error::network(format!("Request failed: {e}")))
             },
-            self.retry_config.clone(),
+            self.retry_config,
         )
         .await?;
 
