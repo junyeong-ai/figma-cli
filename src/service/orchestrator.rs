@@ -102,7 +102,7 @@ impl Orchestrator {
                 id, name, children, ..
             } = child
             {
-                if !filter.matches_page(name) {
+                if !filter.matches_page(name) || !filter.matches_page_id(id) {
                     continue;
                 }
 
@@ -167,25 +167,22 @@ mod tests {
 
     #[test]
     fn test_memory_estimation() {
-        use crate::models::extraction::{ExtractedText, HierarchyPath};
+        use crate::models::extraction::{ExtractedText, HierarchyPath, TextNodeType};
 
         let texts = vec![
             ExtractedText {
                 node_id: "1:1".to_string(),
-                text: "a".repeat(1000), // 1KB
-                path: HierarchyPath {
-                    page_name: "Page".to_string(),
-                    frame_names: vec![],
-                    group_names: None,
-                },
+                node_type: TextNodeType::Text,
+                text: "a".repeat(1000),
+                path: HierarchyPath::new("Page".to_string(), vec![]),
                 sequence_number: 0,
                 style: None,
             };
-            10 // 10KB of text
+            10
         ];
 
         let size_mb = estimate_memory_size(&texts);
         assert!(size_mb > 0.0);
-        assert!(size_mb < 1.0); // Should be less than 1MB
+        assert!(size_mb < 1.0);
     }
 }

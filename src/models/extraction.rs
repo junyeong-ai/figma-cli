@@ -44,10 +44,18 @@ pub struct PageInfo {
     pub text_node_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TextNodeType {
+    Text,
+    Sticky,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExtractedText {
     pub node_id: String,
+    pub node_type: TextNodeType,
     pub text: String,
     pub path: HierarchyPath,
     pub sequence_number: usize,
@@ -59,6 +67,8 @@ pub struct ExtractedText {
 #[serde(rename_all = "camelCase")]
 pub struct HierarchyPath {
     pub page_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub section_name: Option<String>,
     pub frame_names: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub group_names: Option<Vec<String>>,
@@ -163,9 +173,15 @@ impl HierarchyPath {
     pub const fn new(page_name: String, frame_names: Vec<String>) -> Self {
         Self {
             page_name,
+            section_name: None,
             frame_names,
             group_names: None,
         }
+    }
+
+    pub fn with_section(mut self, section: String) -> Self {
+        self.section_name = Some(section);
+        self
     }
 
     pub fn with_groups(mut self, groups: Vec<String>) -> Self {
@@ -175,6 +191,9 @@ impl HierarchyPath {
 
     pub fn to_path_string(&self) -> String {
         let mut parts = vec![self.page_name.clone()];
+        if let Some(section) = &self.section_name {
+            parts.push(section.clone());
+        }
         parts.extend(self.frame_names.iter().cloned());
         if let Some(groups) = &self.group_names {
             parts.extend(groups.iter().cloned());
@@ -223,6 +242,7 @@ mod tests {
 
         let texts = vec![ExtractedText {
             node_id: "1:1".to_string(),
+            node_type: TextNodeType::Text,
             text: "Test".to_string(),
             path: HierarchyPath::new("Page1".to_string(), vec![]),
             sequence_number: 0,

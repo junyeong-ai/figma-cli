@@ -14,6 +14,7 @@ pub fn format_output(
         OutputFormat::Json => format_json(result, pretty)?,
         OutputFormat::Text => format_text(result),
         OutputFormat::Markdown => format_markdown(result),
+        OutputFormat::Summary => super::summary::format_summary(result),
     };
 
     if let Some(path) = output_path {
@@ -160,6 +161,7 @@ mod tests {
             },
             texts: vec![ExtractedText {
                 node_id: "1:1".to_string(),
+                node_type: TextNodeType::Text,
                 text: "Hello, World!".to_string(),
                 path: HierarchyPath::new("Page 1".to_string(), vec!["Frame 1".to_string()]),
                 sequence_number: 0,

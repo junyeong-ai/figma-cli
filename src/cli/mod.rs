@@ -3,6 +3,7 @@
 pub mod args;
 pub mod commands;
 pub mod output;
+pub mod summary;
 
 pub use args::{Cli, Commands, OutputFormat};
 pub use commands::{

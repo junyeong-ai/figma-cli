@@ -1,7 +1,8 @@
 //! Command handlers
 
 use crate::cli::args::{
-    AuthCommand, CacheCommand, ConfigCommand, ExtractArgs, ImagesArgs, InspectArgs, QueryArgs,
+    AuthCommand, CacheCommand, ConfigCommand, ExtractArgs, ImagesArgs, InspectArgs, OutputFormat,
+    QueryArgs,
 };
 use crate::cli::output::format_output;
 use crate::client::{FigmaClient, TokenManager};
@@ -39,6 +40,10 @@ pub async fn handle_extract(args: ExtractArgs) -> Result<()> {
         filter = filter.with_pages(pages);
     }
 
+    if let Some(page_ids) = args.page_ids {
+        filter = filter.with_page_ids(page_ids);
+    }
+
     if let Some(pattern) = args.page_pattern {
         let regex = regex::Regex::new(&pattern).context("Invalid page pattern regex")?;
         filter = filter.with_page_pattern(regex);
@@ -60,22 +65,25 @@ pub async fn handle_extract(args: ExtractArgs) -> Result<()> {
         .await
         .context("Failed to extract content from Figma file")?;
 
-    // Print summary
-    println!();
-    println!("File: {}", &result.metadata.file_name);
-    println!("Version: {}", result.metadata.version);
-    println!();
-    println!("Statistics:");
-    println!("  Pages:      {}", result.stats.total_pages);
-    println!("  Frames:     {}", result.stats.total_frames);
-    println!("  Text nodes: {}", result.stats.total_text_nodes);
-    println!("  Characters: {}", result.stats.total_characters);
-    println!("  Time:       {}ms", result.stats.extraction_time_ms);
-    println!("  Memory:     {:.2}MB", result.stats.memory_size_mb);
-    println!();
+    let format = args.format;
+
+    // Print stats header (skip for Summary format which is AI-optimized)
+    if !matches!(format, OutputFormat::Summary) {
+        println!();
+        println!("File: {}", &result.metadata.file_name);
+        println!("Version: {}", result.metadata.version);
+        println!();
+        println!("Statistics:");
+        println!("  Pages:      {}", result.stats.total_pages);
+        println!("  Frames:     {}", result.stats.total_frames);
+        println!("  Text nodes: {}", result.stats.total_text_nodes);
+        println!("  Characters: {}", result.stats.total_characters);
+        println!("  Time:       {}ms", result.stats.extraction_time_ms);
+        println!("  Memory:     {:.2}MB", result.stats.memory_size_mb);
+        println!();
+    }
 
     // Format and output
-    let format = args.format;
     format_output(&result, format, args.output.as_deref(), args.pretty)?;
 
     Ok(())

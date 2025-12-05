@@ -61,6 +61,10 @@ pub struct ExtractArgs {
     #[arg(short, long, value_delimiter = ',')]
     pub pages: Option<Vec<String>>,
 
+    /// Filter by page IDs (comma-separated, e.g., "123:456,789:012")
+    #[arg(long, value_delimiter = ',')]
+    pub page_ids: Option<Vec<String>>,
+
     /// Filter by page name pattern (regex)
     #[arg(long)]
     pub page_pattern: Option<String>,
@@ -299,6 +303,7 @@ pub enum OutputFormat {
     Json,
     Text,
     Markdown,
+    Summary,
 }
 
 impl ExtractArgs {

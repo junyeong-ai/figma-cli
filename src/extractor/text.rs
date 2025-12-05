@@ -1,48 +1,39 @@
 //! Text node extraction
 
 use crate::models::document::Node;
-use crate::models::extraction::{ExtractedText, HierarchyPath};
+use crate::models::extraction::{ExtractedText, HierarchyPath, TextNodeType, TextStyleInfo};
 use crate::service::traversal::NodeVisitor;
 
-/// Extracts text content from document nodes
+#[derive(Default)]
 pub struct TextExtractor {
     texts: Vec<ExtractedText>,
     sequence_number: usize,
 }
 
 impl TextExtractor {
-    pub const fn new() -> Self {
-        Self {
-            texts: Vec::new(),
-            sequence_number: 0,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn into_texts(self) -> Vec<ExtractedText> {
         self.texts
     }
 
-    pub const fn count(&self) -> usize {
+    pub fn count(&self) -> usize {
         self.texts.len()
-    }
-}
-
-impl Default for TextExtractor {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
 impl NodeVisitor for TextExtractor {
     fn visit_node(&mut self, node: &Node, _depth: usize, path: &[String]) {
-        let (id, characters, style) = match node {
+        let (id, node_type, characters, style) = match node {
             Node::Text {
                 id,
                 characters,
                 style,
                 ..
-            } => (id, characters, style.as_ref()),
-            Node::Sticky { id, characters, .. } => (id, characters, None),
+            } => (id, TextNodeType::Text, characters, style.as_ref()),
+            Node::Sticky { id, characters, .. } => (id, TextNodeType::Sticky, characters, None),
             _ => return,
         };
 
@@ -50,7 +41,7 @@ impl NodeVisitor for TextExtractor {
             return;
         }
 
-        let style_info = style.map(|s| crate::models::extraction::TextStyleInfo {
+        let style_info = style.map(|s| TextStyleInfo {
             font_family: s
                 .font_family
                 .clone()
@@ -61,6 +52,7 @@ impl NodeVisitor for TextExtractor {
 
         self.texts.push(ExtractedText {
             node_id: id.clone(),
+            node_type,
             text: characters.clone(),
             path: build_hierarchy_path(path),
             sequence_number: self.sequence_number,
@@ -71,40 +63,31 @@ impl NodeVisitor for TextExtractor {
 }
 
 fn build_hierarchy_path(path: &[String]) -> HierarchyPath {
-    // Path structure: [Document, Canvas, Frame, ...]
-    // Canvas = Page, subsequent items before Text node = Frame hierarchy
+    let mut iter = path.iter().skip(1);
 
-    let mut page_name = "Unknown Page".to_string();
+    let page_name = iter.next().cloned().unwrap_or_else(|| "Unknown".to_string());
+
+    let mut section_name = None;
     let mut frame_names = Vec::new();
-    let mut group_names = Vec::new();
 
-    let mut iter = path.iter().skip(1); // Skip document name
-
-    // First item after document is the Canvas (Page)
-    if let Some(canvas) = iter.next() {
-        page_name = canvas.clone();
-    }
-
-    // Remaining items are frames and groups
-    for item in iter {
-        // Simple heuristic: if it contains "Frame" or starts with uppercase, it's likely a frame
-        // Otherwise, it might be a group
-        if item.contains("Frame") || item.chars().next().is_some_and(char::is_uppercase) {
-            frame_names.push(item.clone());
+    for name in iter {
+        if section_name.is_none() && is_section_name(name) {
+            section_name = Some(name.clone());
         } else {
-            group_names.push(item.clone());
+            frame_names.push(name.clone());
         }
     }
 
     HierarchyPath {
         page_name,
+        section_name,
         frame_names,
-        group_names: if group_names.is_empty() {
-            None
-        } else {
-            Some(group_names)
-        },
+        group_names: None,
     }
+}
+
+fn is_section_name(name: &str) -> bool {
+    name.to_lowercase().contains("section") || name.contains(" > ") || name.starts_with("> ")
 }
 
 #[cfg(test)]
@@ -143,9 +126,9 @@ mod tests {
 
         let texts = extractor.into_texts();
         assert_eq!(texts.len(), 1);
+        assert_eq!(texts[0].node_type, TextNodeType::Text);
         assert_eq!(texts[0].text, "Hello, World!");
         assert_eq!(texts[0].path.page_name, "Page 1");
-        assert!(texts[0].path.frame_names.contains(&"Frame 1".to_string()));
     }
 
     #[test]
@@ -180,16 +163,17 @@ mod tests {
         let path = vec![
             "Document".to_string(),
             "Page 1".to_string(),
-            "Section 1".to_string(),
+            "Section > Features".to_string(),
+            "Frame 1".to_string(),
         ];
 
         let sticky = Node::Sticky {
             node_type: "STICKY".to_string(),
             id: "2:1".to_string(),
-            name: "Planning Note".to_string(),
+            name: "Note".to_string(),
             visible: true,
             locked: false,
-            characters: "개발자 확인 필요: 성능 이슈 체크".to_string(),
+            characters: "TODO: Review this implementation".to_string(),
             absolute_bounding_box: None,
             fills: vec![],
         };
@@ -198,7 +182,12 @@ mod tests {
 
         let texts = extractor.into_texts();
         assert_eq!(texts.len(), 1);
-        assert_eq!(texts[0].text, "개발자 확인 필요: 성능 이슈 체크");
+        assert_eq!(texts[0].node_type, TextNodeType::Sticky);
+        assert_eq!(texts[0].text, "TODO: Review this implementation");
+        assert_eq!(
+            texts[0].path.section_name,
+            Some("Section > Features".to_string())
+        );
         assert!(texts[0].style.is_none());
     }
 }

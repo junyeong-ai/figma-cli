@@ -5,6 +5,7 @@ use regex::Regex;
 #[derive(Debug, Clone, Default)]
 pub struct FilterCriteria {
     pub page_names: Option<Vec<String>>,
+    pub page_ids: Option<Vec<String>>,
     pub page_pattern: Option<Regex>,
     pub frame_pattern: Option<Regex>,
     pub include_hidden: bool,
@@ -17,6 +18,11 @@ impl FilterCriteria {
 
     pub fn with_pages(mut self, pages: Vec<String>) -> Self {
         self.page_names = Some(pages);
+        self
+    }
+
+    pub fn with_page_ids(mut self, page_ids: Vec<String>) -> Self {
+        self.page_ids = Some(page_ids);
         self
     }
 
@@ -51,6 +57,14 @@ impl FilterCriteria {
         true
     }
 
+    pub fn matches_page_id(&self, page_id: &str) -> bool {
+        if let Some(ids) = &self.page_ids {
+            ids.iter().any(|id| id == page_id)
+        } else {
+            true
+        }
+    }
+
     pub fn matches_frame(&self, frame_name: &str) -> bool {
         if let Some(pattern) = &self.frame_pattern {
             pattern.is_match(frame_name)
@@ -61,6 +75,7 @@ impl FilterCriteria {
 
     pub const fn is_empty(&self) -> bool {
         self.page_names.is_none()
+            && self.page_ids.is_none()
             && self.page_pattern.is_none()
             && self.frame_pattern.is_none()
             && !self.include_hidden
