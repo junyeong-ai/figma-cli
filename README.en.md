@@ -70,6 +70,7 @@ figma-cli extract <FILE_KEY> --frame-pattern "^Component/.*"
 figma-cli extract <FILE_KEY> --format json --output design.json
 figma-cli extract <FILE_KEY> --format markdown --output design.md
 figma-cli extract <FILE_KEY> --format text
+figma-cli extract <FILE_KEY> --format summary    # AI-optimized markdown
 
 # Pretty JSON
 figma-cli extract <FILE_KEY> --pretty

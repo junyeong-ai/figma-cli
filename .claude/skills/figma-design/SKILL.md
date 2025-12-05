@@ -31,6 +31,7 @@ figma-cli extract FILE_KEY --frame-pattern "^Component/.*"
 
 # Format options
 figma-cli extract FILE_KEY --format markdown -o design.md
+figma-cli extract FILE_KEY --format summary     # AI-optimized (no stats header)
 
 # With images
 figma-cli extract FILE_KEY --with-images --image-dir ./images --include-hidden

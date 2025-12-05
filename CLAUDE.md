@@ -8,7 +8,7 @@ Essential implementation knowledge for this Rust Figma CLI.
 
 ```
 src/
-├── core/              # Domain logic (zero dependencies)
+├── core/              # Domain logic (zero dependencies on outer layers)
 │   ├── cache.rs       # BLAKE3-hashed cache (RwLock + HashMap)
 │   ├── query.rs       # JMESPath query engine
 │   ├── config.rs      # Hierarchical config system
@@ -21,7 +21,10 @@ src/
 │   └── traversal.rs     # Visitor pattern tree traversal
 ├── cli/               # User interface
 │   ├── commands.rs    # Command handlers
+│   ├── context.rs     # ClientContext (config/token/cache/client setup)
 │   └── args.rs        # CLI arguments (clap)
+├── extractor/         # Content extractors
+│   └── text.rs        # Text node extraction visitor
 └── models/            # Data structures
     └── document.rs    # Figma API response types
 ```
@@ -32,72 +35,76 @@ src/
 
 ## Critical Implementation Patterns
 
-### 1. Serde Untagged Enum for Figma Nodes
+### 1. Node Composition Pattern
 
-**Why**: Figma's `Option<Color>`, `Option<BoundingBox>` fields fail with internally tagged enums
+**Why**: Eliminated massive code duplication (22 variants × 5 common fields)
 
-**Location**: `src/models/document.rs:53-618`
+**Location**: `src/models/document.rs`
 
 ```rust
-#[serde(untagged)]
-pub enum Node {
-    Canvas {
-        #[serde(with = "option_struct")]
-        background_color: Option<Color>,
-        // ...
-    },
+// Common fields extracted to NodeBase
+pub struct NodeBase {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub id: String,
+    pub name: String,
+    pub visible: bool,
+    pub locked: bool,
 }
 
-mod option_struct {
-    pub fn deserialize<'de, D, T>(d: D) -> Result<Option<T>, D::Error> {
-        let v = Value::deserialize(d)?;
-        Ok(if v.is_null() { None } else { Some(from_value(v)?) })
-    }
+// Main Node struct with composition
+pub struct Node {
+    pub base: NodeBase,
+    pub data: NodeData,
+}
+
+// Variant-specific data
+#[serde(untagged)]
+pub enum NodeData {
+    Canvas { background_color: Option<Color>, children: Vec<Node>, ... },
+    Frame { absolute_bounding_box: Option<BoundingBox>, children: Vec<Node>, ... },
+    Text { characters: String, style: Option<TypeStyle>, ... },
+    // ... other variants
+}
+
+// Accessor methods
+impl Node {
+    pub fn id(&self) -> &str { &self.base.id }
+    pub fn name(&self) -> &str { &self.base.name }
+    pub fn children(&self) -> Option<&[Node]> { ... }
 }
 ```
 
-**Critical**: Don't change to `#[serde(tag = "type")]` - it breaks `Option<Struct>` deserialization.
+**Critical**: Custom `Serialize` and `Deserialize` implementations flatten the structure for API compatibility.
 
 ### 2. Cache System
 
-**Files**: `src/core/cache.rs`, `src/client/figma.rs:99-120`
+**Files**: `src/core/cache.rs`, `src/client/figma.rs`
 
 **Design**:
 - Hash: `BLAKE3(file_key + depth)` for cache keys
 - Index: `Arc<RwLock<HashMap<String, CacheMetadata>>>` for O(1) lookups
 - Storage: JSON files in `~/Library/Caches/figma-cli/`
 - TTL: 24h default (configurable)
-- Separation: File cache vs node cache (different endpoints)
+- Interface: Pure `serde_json::Value` (no domain model dependencies)
 
 **Auto-caching integration**:
 ```rust
 // In FigmaClient::get_file()
 if let Some(cache) = &self.cache
-    && let Ok(Some(cached)) = cache.get_file(key, depth) {
-    return Ok(cached);  // Cache hit
+    && let Ok(Some(cached_value)) = cache.get_file(key, depth) {
+    // Deserialize in client layer
+    let file: FigmaFile = serde_json::from_value(cached_value)?;
+    return Ok(file);
 }
-let file = self.http_get(...).await?;  // API call
+let file = self.http_get(...).await?;
 if let Some(cache) = &self.cache {
-    cache.put_file(&file, depth)?;  // Populate
+    // Serialize in client layer
+    let value = serde_json::to_value(&file)?;
+    cache.put_file(key, version, &value, depth)?;
 }
 Ok(file)
 ```
-
-**Critical Lock Pattern** (`src/core/cache.rs:245-263`):
-```rust
-fn update_access_time(&self, key: &str) -> Result<()> {
-    {
-        // Acquire write lock in block scope
-        if let Some(meta) = self.index.write().get_mut(key) {
-            meta.accessed_at = Utc::now();
-        }
-    } // Lock released here
-    self.save_index()?;  // Now safe to acquire read lock
-    Ok(())
-}
-```
-
-**Why**: Calling `save_index()` while holding write lock → deadlock (read lock attempt while write-locked).
 
 ### 3. Query Engine (JMESPath)
 
@@ -113,7 +120,7 @@ jmespath::Variable::Number(n) => serde_json::to_value(n)
 
 ### 4. Visitor Pattern for Traversal
 
-**Location**: `src/service/traversal.rs:19-43`
+**Location**: `src/service/traversal.rs`
 
 **Why**: Decouples traversal from extraction logic. Add new extractors without modifying traversal.
 
@@ -122,18 +129,44 @@ pub trait NodeVisitor {
     fn visit_node(&mut self, node: &Node, depth: usize, path: &[String]);
 }
 
-pub fn traverse_node<V: NodeVisitor>(
+fn traverse_node<V: NodeVisitor>(
     node: &Node, visitor: &mut V, depth: usize, path: &mut Vec<String>
 ) {
     visitor.visit_node(node, depth, path);
-    if !get_children(node).is_empty() {
-        path.push(get_node_name(node).to_string());
-        for child in get_children(node) {
+    if let Some(children) = node.children()
+        && !children.is_empty()
+    {
+        path.push(node.name().to_string());
+        for child in children {
             traverse_node(child, visitor, depth + 1, path);
         }
         path.pop();
     }
 }
+```
+
+### 5. ClientContext for DRY Command Handlers
+
+**Location**: `src/cli/context.rs`
+
+**Why**: Eliminates repeated boilerplate in command handlers.
+
+```rust
+pub struct ClientContext {
+    pub config: Config,
+    pub client: FigmaClient,
+    pub token: String,
+}
+
+impl ClientContext {
+    pub fn new(config_path: Option<&str>) -> Result<Self> {
+        // Loads config, gets token, sets up cache, creates client
+    }
+}
+
+// Usage in command handlers:
+let ctx = ClientContext::new(args.config.as_deref())?;
+let result = ctx.client.get_file(&file_key, depth).await?;
 ```
 
 ---
@@ -157,7 +190,7 @@ pub fn traverse_node<V: NodeVisitor>(
 
 1. Create struct in `src/extractor/`
 2. Implement `NodeVisitor` trait
-3. Use `traverse_node()` with your visitor
+3. Use `traverse_document()` with your visitor
 
 ---
 
@@ -172,7 +205,7 @@ pub fn traverse_node<V: NodeVisitor>(
 ## Testing
 
 ```bash
-cargo test                    # All tests (42 total)
+cargo test                    # All tests (45 total)
 cargo test cache::            # Cache module
 cargo test query::            # Query module
 FIGMA_TOKEN=xxx cargo run -- extract FILE_KEY
