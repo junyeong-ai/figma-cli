@@ -468,6 +468,9 @@ pub enum Node {
         #[serde(default)]
         locked: bool,
 
+        #[serde(default)]
+        characters: String,
+
         #[serde(
             rename = "absoluteBoundingBox",
             default,

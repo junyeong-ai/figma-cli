@@ -35,44 +35,38 @@ impl Default for TextExtractor {
 
 impl NodeVisitor for TextExtractor {
     fn visit_node(&mut self, node: &Node, _depth: usize, path: &[String]) {
-        if let Node::Text {
-            id,
-            characters,
-            style,
-            ..
-        } = node
-        {
-            // Skip empty text nodes
-            if characters.trim().is_empty() {
-                return;
-            }
+        let (id, characters, style) = match node {
+            Node::Text {
+                id,
+                characters,
+                style,
+                ..
+            } => (id, characters, style.as_ref()),
+            Node::Sticky { id, characters, .. } => (id, characters, None),
+            _ => return,
+        };
 
-            // Build hierarchy path
-            let hierarchy = build_hierarchy_path(path);
-
-            // Extract text with context
-            let style_info = style
-                .as_ref()
-                .map(|s| crate::models::extraction::TextStyleInfo {
-                    font_family: s
-                        .font_family
-                        .clone()
-                        .unwrap_or_else(|| "Unknown".to_string()),
-                    font_size: s.font_size.unwrap_or(16.0),
-                    font_weight: s.font_weight.unwrap_or(400),
-                });
-
-            let extracted = ExtractedText {
-                node_id: id.clone(),
-                text: characters.clone(),
-                path: hierarchy,
-                sequence_number: self.sequence_number,
-                style: style_info,
-            };
-
-            self.texts.push(extracted);
-            self.sequence_number += 1;
+        if characters.trim().is_empty() {
+            return;
         }
+
+        let style_info = style.map(|s| crate::models::extraction::TextStyleInfo {
+            font_family: s
+                .font_family
+                .clone()
+                .unwrap_or_else(|| "Unknown".to_string()),
+            font_size: s.font_size.unwrap_or(16.0),
+            font_weight: s.font_weight.unwrap_or(400),
+        });
+
+        self.texts.push(ExtractedText {
+            node_id: id.clone(),
+            text: characters.clone(),
+            path: build_hierarchy_path(path),
+            sequence_number: self.sequence_number,
+            style: style_info,
+        });
+        self.sequence_number += 1;
     }
 }
 
@@ -178,5 +172,33 @@ mod tests {
         assert_eq!(texts[0].sequence_number, 0);
         assert_eq!(texts[1].sequence_number, 1);
         assert_eq!(texts[2].sequence_number, 2);
+    }
+
+    #[test]
+    fn test_sticky_extraction() {
+        let mut extractor = TextExtractor::new();
+        let path = vec![
+            "Document".to_string(),
+            "Page 1".to_string(),
+            "Section 1".to_string(),
+        ];
+
+        let sticky = Node::Sticky {
+            node_type: "STICKY".to_string(),
+            id: "2:1".to_string(),
+            name: "Planning Note".to_string(),
+            visible: true,
+            locked: false,
+            characters: "개발자 확인 필요: 성능 이슈 체크".to_string(),
+            absolute_bounding_box: None,
+            fills: vec![],
+        };
+
+        extractor.visit_node(&sticky, 2, &path);
+
+        let texts = extractor.into_texts();
+        assert_eq!(texts.len(), 1);
+        assert_eq!(texts[0].text, "개발자 확인 필요: 성능 이슈 체크");
+        assert!(texts[0].style.is_none());
     }
 }

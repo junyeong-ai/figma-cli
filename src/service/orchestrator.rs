@@ -7,7 +7,7 @@ use crate::models::document::FigmaFile;
 use crate::models::extraction::{
     DocumentStructure, ExtractionResult, ExtractionStats, FileMetadata, PageInfo,
 };
-use crate::service::traversal::traverse_document;
+use crate::service::traversal::{traverse_document, traverse_pages};
 use chrono::Utc;
 use std::time::Instant;
 
@@ -94,8 +94,8 @@ impl Orchestrator {
         Vec<crate::models::extraction::ExtractedText>,
         DocumentStructure,
     ) {
-        // Build document structure overview
         let mut pages = Vec::new();
+        let mut filtered_page_ids = Vec::new();
 
         for child in &file.document.children {
             if let crate::models::document::Node::Canvas {
@@ -106,27 +106,26 @@ impl Orchestrator {
                     continue;
                 }
 
-                let frame_count = count_frames(children);
-                let text_node_count = count_text_nodes(children);
-
+                filtered_page_ids.push(id.clone());
                 pages.push(PageInfo {
                     id: id.clone(),
                     name: name.clone(),
-                    frame_count,
-                    text_node_count,
+                    frame_count: count_frames(children),
+                    text_node_count: count_text_nodes(children),
                 });
             }
         }
 
         let structure = DocumentStructure { pages };
 
-        // Extract text using visitor pattern
         let mut text_extractor = TextExtractor::new();
-        traverse_document(&file.document, &mut text_extractor);
+        if filter.is_empty() {
+            traverse_document(&file.document, &mut text_extractor);
+        } else {
+            traverse_pages(&file.document, &filtered_page_ids, &mut text_extractor);
+        }
 
-        let texts = text_extractor.into_texts();
-
-        (texts, structure)
+        (text_extractor.into_texts(), structure)
     }
 }
 
@@ -138,22 +137,21 @@ fn count_frames(nodes: &[crate::models::document::Node]) -> usize {
 }
 
 fn count_text_nodes(nodes: &[crate::models::document::Node]) -> usize {
-    let mut count = 0;
+    use crate::models::document::Node;
 
-    for node in nodes {
-        match node {
-            crate::models::document::Node::Text { .. } => count += 1,
-            crate::models::document::Node::Frame { children, .. }
-            | crate::models::document::Node::Group { children, .. }
-            | crate::models::document::Node::Component { children, .. }
-            | crate::models::document::Node::Instance { children, .. } => {
-                count += count_text_nodes(children);
+    nodes.iter().fold(0, |count, node| {
+        count
+            + match node {
+                Node::Text { .. } | Node::Sticky { .. } => 1,
+                Node::Frame { children, .. }
+                | Node::Group { children, .. }
+                | Node::Section { children, .. }
+                | Node::Component { children, .. }
+                | Node::ComponentSet { children, .. }
+                | Node::Instance { children, .. } => count_text_nodes(children),
+                _ => 0,
             }
-            _ => {}
-        }
-    }
-
-    count
+    })
 }
 
 fn estimate_memory_size(texts: &[crate::models::extraction::ExtractedText]) -> f64 {
