@@ -1,13 +1,11 @@
 //! Document tree traversal
 
-use crate::models::document::{Document, Node};
+use crate::models::document::{Document, Node, NodeData};
 
-/// Visitor pattern for traversing document nodes
 pub trait NodeVisitor {
     fn visit_node(&mut self, node: &Node, depth: usize, path: &[String]);
 }
 
-/// Traverse the document tree depth-first
 pub fn traverse_document<V: NodeVisitor>(document: &Document, visitor: &mut V) {
     let mut path = vec![document.name.clone()];
 
@@ -16,13 +14,12 @@ pub fn traverse_document<V: NodeVisitor>(document: &Document, visitor: &mut V) {
     }
 }
 
-/// Traverse specific pages (Canvas nodes) from a document
 pub fn traverse_pages<V: NodeVisitor>(document: &Document, page_ids: &[String], visitor: &mut V) {
     let mut path = vec![document.name.clone()];
 
     for child in &document.children {
-        if let Node::Canvas { id, .. } = child
-            && page_ids.contains(id)
+        if matches!(&child.data, NodeData::Canvas { .. })
+            && page_ids.contains(&child.id().to_string())
         {
             traverse_node(child, visitor, 1, &mut path);
         }
@@ -35,50 +32,23 @@ fn traverse_node<V: NodeVisitor>(
     depth: usize,
     path: &mut Vec<String>,
 ) {
-    // Visit current node
     visitor.visit_node(node, depth, path);
 
-    // Get children based on node type
-    let children = get_children(node);
-
-    if !children.is_empty() {
-        // Add current node name to path
-        path.push(get_node_name(node).to_string());
-
-        // Visit children
+    if let Some(children) = node.children()
+        && !children.is_empty()
+    {
+        path.push(node.name().to_string());
         for child in children {
             traverse_node(child, visitor, depth + 1, path);
         }
-
-        // Remove current node from path
         path.pop();
     }
-}
-
-fn get_children(node: &Node) -> &[Node] {
-    match node {
-        Node::Canvas { children, .. }
-        | Node::Section { children, .. }
-        | Node::Frame { children, .. }
-        | Node::Group { children, .. }
-        | Node::Component { children, .. }
-        | Node::ComponentSet { children, .. }
-        | Node::Instance { children, .. }
-        | Node::BooleanOperation { children, .. }
-        | Node::Table { children, .. }
-        | Node::TableCell { children, .. }
-        | Node::Other { children, .. } => children,
-        _ => &[],
-    }
-}
-
-fn get_node_name(node: &Node) -> &str {
-    node.name()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::document::{Color, NodeBase};
 
     struct CountingVisitor {
         count: usize,
@@ -113,31 +83,38 @@ mod tests {
             name: "Test Doc".to_string(),
             node_type: "DOCUMENT".to_string(),
             scroll_behavior: None,
-            children: vec![Node::Canvas {
-                node_type: "CANVAS".to_string(),
-                id: "0:1".to_string(),
-                name: "Page 1".to_string(),
-                visible: true,
-                locked: false,
-                background_color: Some(crate::models::document::Color {
-                    r: 1.0,
-                    g: 1.0,
-                    b: 1.0,
-                    a: 1.0,
-                }),
-                export_settings: vec![],
-                children: vec![Node::Frame {
-                    node_type: "FRAME".to_string(),
-                    id: "0:2".to_string(),
-                    name: "Frame 1".to_string(),
+            children: vec![Node {
+                base: NodeBase {
+                    node_type: "CANVAS".to_string(),
+                    id: "0:1".to_string(),
+                    name: "Page 1".to_string(),
                     visible: true,
                     locked: false,
-                    absolute_bounding_box: None,
-                    fills: vec![],
-                    clips_content: false,
-                    bound_variables: None,
-                    children: vec![],
-                }],
+                },
+                data: NodeData::Canvas {
+                    background_color: Some(Color {
+                        r: 1.0,
+                        g: 1.0,
+                        b: 1.0,
+                        a: 1.0,
+                    }),
+                    export_settings: vec![],
+                    children: vec![Node {
+                        base: NodeBase {
+                            node_type: "FRAME".to_string(),
+                            id: "0:2".to_string(),
+                            name: "Frame 1".to_string(),
+                            visible: true,
+                            locked: false,
+                        },
+                        data: NodeData::Frame {
+                            absolute_bounding_box: None,
+                            fills: vec![],
+                            clips_content: false,
+                            children: vec![],
+                        },
+                    }],
+                },
             }],
         };
 

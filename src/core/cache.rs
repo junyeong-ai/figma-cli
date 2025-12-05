@@ -1,5 +1,4 @@
 use crate::core::errors::Error;
-use crate::models::document::FigmaFile;
 use blake3::Hasher;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
@@ -55,7 +54,11 @@ impl Cache {
         Ok(cache)
     }
 
-    pub fn get_file(&self, file_key: &str, depth: Option<u32>) -> Result<Option<FigmaFile>> {
+    pub fn get_file(
+        &self,
+        file_key: &str,
+        depth: Option<u32>,
+    ) -> Result<Option<serde_json::Value>> {
         let cache_key = self.cache_key(file_key, depth);
         let path = self.entry_path(&cache_key);
 
@@ -71,19 +74,21 @@ impl Cache {
         }
 
         self.update_access_time(&cache_key)?;
-
-        serde_json::from_value(entry.data)
-            .map(Some)
-            .map_err(|e| Error::parse(format!("Cache deserialization failed: {e}")))
+        Ok(Some(entry.data))
     }
 
-    pub fn put_file(&self, file: &FigmaFile, depth: Option<u32>) -> Result<()> {
-        let cache_key = self.cache_key(&file.file_key, depth);
+    pub fn put_file(
+        &self,
+        file_key: &str,
+        version: &str,
+        data: &serde_json::Value,
+        depth: Option<u32>,
+    ) -> Result<()> {
+        let cache_key = self.cache_key(file_key, depth);
         let entry = CacheEntry {
-            file_key: file.file_key.clone(),
-            version: file.version.clone(),
-            data: serde_json::to_value(file)
-                .map_err(|e| Error::other(format!("Cache serialization failed: {e}")))?,
+            file_key: file_key.to_string(),
+            version: version.to_string(),
+            data: data.clone(),
             created_at: Utc::now(),
             accessed_at: Utc::now(),
             depth,

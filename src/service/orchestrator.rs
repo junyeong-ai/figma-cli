@@ -3,7 +3,7 @@
 use crate::client::{FigmaClient, Result};
 use crate::extractor::TextExtractor;
 use crate::models::config::FilterCriteria;
-use crate::models::document::FigmaFile;
+use crate::models::document::{FigmaFile, Node, NodeData};
 use crate::models::extraction::{
     DocumentStructure, ExtractionResult, ExtractionStats, FileMetadata, PageInfo,
 };
@@ -11,7 +11,6 @@ use crate::service::traversal::{traverse_document, traverse_pages};
 use chrono::Utc;
 use std::time::Instant;
 
-/// Orchestrates the extraction process
 pub struct Orchestrator {
     client: FigmaClient,
 }
@@ -21,7 +20,6 @@ impl Orchestrator {
         Self { client }
     }
 
-    /// Extract content from a Figma file
     pub async fn extract(
         &self,
         file_key: &str,
@@ -32,7 +30,6 @@ impl Orchestrator {
 
         tracing::info!("Starting extraction for file: {}", file_key);
 
-        // Fetch the file
         let file = self.client.get_file(file_key, depth).await?;
 
         tracing::info!(
@@ -42,10 +39,8 @@ impl Orchestrator {
             file.document.children.len()
         );
 
-        // Filter and extract
         let (texts, structure) = self.extract_content(&file, &filter);
 
-        // Calculate statistics
         let extraction_time_ms = start_time.elapsed().as_millis() as u64;
         let total_characters: usize = texts.iter().map(|t| t.text.len()).sum();
 
@@ -59,7 +54,6 @@ impl Orchestrator {
             memory_size_mb: estimate_memory_size(&texts),
         };
 
-        // Build metadata
         let metadata = FileMetadata {
             file_key: file.file_key.clone(),
             file_name: file.name.clone(),
@@ -98,18 +92,18 @@ impl Orchestrator {
         let mut filtered_page_ids = Vec::new();
 
         for child in &file.document.children {
-            if let crate::models::document::Node::Canvas {
-                id, name, children, ..
-            } = child
-            {
+            if let NodeData::Canvas { children, .. } = &child.data {
+                let id = child.id();
+                let name = child.name();
+
                 if !filter.matches_page(name) || !filter.matches_page_id(id) {
                     continue;
                 }
 
-                filtered_page_ids.push(id.clone());
+                filtered_page_ids.push(id.to_string());
                 pages.push(PageInfo {
-                    id: id.clone(),
-                    name: name.clone(),
+                    id: id.to_string(),
+                    name: name.to_string(),
                     frame_count: count_frames(children),
                     text_node_count: count_text_nodes(children),
                 });
@@ -129,26 +123,24 @@ impl Orchestrator {
     }
 }
 
-fn count_frames(nodes: &[crate::models::document::Node]) -> usize {
+fn count_frames(nodes: &[Node]) -> usize {
     nodes
         .iter()
-        .filter(|n| matches!(n, crate::models::document::Node::Frame { .. }))
+        .filter(|n| matches!(&n.data, NodeData::Frame { .. }))
         .count()
 }
 
-fn count_text_nodes(nodes: &[crate::models::document::Node]) -> usize {
-    use crate::models::document::Node;
-
+fn count_text_nodes(nodes: &[Node]) -> usize {
     nodes.iter().fold(0, |count, node| {
         count
-            + match node {
-                Node::Text { .. } | Node::Sticky { .. } => 1,
-                Node::Frame { children, .. }
-                | Node::Group { children, .. }
-                | Node::Section { children, .. }
-                | Node::Component { children, .. }
-                | Node::ComponentSet { children, .. }
-                | Node::Instance { children, .. } => count_text_nodes(children),
+            + match &node.data {
+                NodeData::Text { .. } | NodeData::Sticky { .. } => 1,
+                NodeData::Frame { children, .. }
+                | NodeData::Group { children, .. }
+                | NodeData::Section { children, .. }
+                | NodeData::Component { children, .. }
+                | NodeData::ComponentSet { children, .. }
+                | NodeData::Instance { children, .. } => count_text_nodes(children),
                 _ => 0,
             }
     })
@@ -156,9 +148,9 @@ fn count_text_nodes(nodes: &[crate::models::document::Node]) -> usize {
 
 fn estimate_memory_size(texts: &[crate::models::extraction::ExtractedText]) -> f64 {
     let text_bytes: usize = texts.iter().map(|t| t.text.len()).sum();
-    let overhead_per_item = 200; // Rough estimate for struct overhead
+    let overhead_per_item = 200;
     let total_bytes = text_bytes + (texts.len() * overhead_per_item);
-    (total_bytes as f64) / (1024.0 * 1024.0) // Convert to MB
+    (total_bytes as f64) / (1024.0 * 1024.0)
 }
 
 #[cfg(test)]

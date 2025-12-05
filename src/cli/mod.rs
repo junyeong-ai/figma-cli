@@ -2,6 +2,7 @@
 
 pub mod args;
 pub mod commands;
+mod context;
 pub mod output;
 pub mod summary;
 

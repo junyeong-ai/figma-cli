@@ -1,5 +1,6 @@
 //! Command handlers
 
+use super::context::ClientContext;
 use crate::cli::args::{
     AuthCommand, CacheCommand, ConfigCommand, ExtractArgs, ImagesArgs, InspectArgs, OutputFormat,
     QueryArgs,
@@ -11,7 +12,6 @@ use crate::models::config::FilterCriteria;
 use crate::service::Orchestrator;
 use anyhow::{Context, Result};
 use std::io::{self, Write};
-use std::sync::Arc;
 
 /// Handle extract command
 pub async fn handle_extract(args: ExtractArgs) -> Result<()> {
@@ -21,17 +21,7 @@ pub async fn handle_extract(args: ExtractArgs) -> Result<()> {
 
     tracing::info!("Extracting from file: {}", file_key);
 
-    let config = Config::load()?;
-    let token = config
-        .token
-        .clone()
-        .or_else(|| TokenManager::get().ok().flatten())
-        .context("No authentication token found. Run 'figma-cli auth login' first")?;
-
-    let cache_dir = config.cache_path();
-    let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
-
-    let client = FigmaClient::with_timeout(token, config.http.timeout)?.with_cache(cache);
+    let ctx = ClientContext::new(None)?;
 
     // Build filter criteria
     let mut filter = FilterCriteria::new();
@@ -59,7 +49,7 @@ pub async fn handle_extract(args: ExtractArgs) -> Result<()> {
     }
 
     // Create orchestrator and extract
-    let orchestrator = Orchestrator::new(client);
+    let orchestrator = Orchestrator::new(ctx.client);
     let result = orchestrator
         .extract(&file_key, filter, args.depth)
         .await
@@ -572,8 +562,6 @@ fn parse_toml_value(existing: &toml::Value, value_str: &str) -> Result<toml::Val
 
 /// Handle inspect command
 pub async fn handle_inspect(args: InspectArgs) -> Result<()> {
-    use crate::core::config::Config;
-
     // Parse file key and node IDs from URL
     let (file_key, url_node_ids) = crate::utils::parse_file_and_nodes_from_url(&args.file)
         .map_err(|e| anyhow::anyhow!("Failed to parse file/node IDs: {e}"))?;
@@ -606,26 +594,11 @@ pub async fn handle_inspect(args: InspectArgs) -> Result<()> {
         file_key
     );
 
-    // Load config
-    let config = if let Some(config_path) = args.config {
-        Config::load_from(&config_path)?
-    } else {
-        Config::load()?
-    };
-
-    let token = config
-        .token
-        .clone()
-        .or_else(|| TokenManager::get().ok().flatten())
-        .context("No authentication token found. Run 'figma-cli auth login' first")?;
-
-    let cache_dir = config.cache_path();
-    let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
-
-    let client = FigmaClient::with_timeout(token, config.http.timeout)?.with_cache(cache);
+    let ctx = ClientContext::new(args.config.as_deref())?;
 
     // Fetch nodes
-    let nodes_response = client
+    let nodes_response = ctx
+        .client
         .get_nodes(&file_key, &node_ids, Some(args.depth))
         .await
         .context("Failed to fetch nodes from Figma")?;
@@ -662,7 +635,6 @@ pub async fn handle_inspect(args: InspectArgs) -> Result<()> {
 
 /// Handle images command
 pub async fn handle_images(args: ImagesArgs) -> Result<()> {
-    use crate::core::config::Config;
     use crate::images::ImageProcessor;
 
     // Parse file key and node IDs from URL
@@ -671,24 +643,11 @@ pub async fn handle_images(args: ImagesArgs) -> Result<()> {
 
     tracing::info!("Processing images from file: {}", file_key);
 
-    // Load config
-    let mut config = if let Some(config_path) = args.config {
-        Config::load_from(&config_path)?
-    } else {
-        Config::load()?
-    };
+    let mut ctx = ClientContext::new(args.config.as_deref())?;
 
     // Override config with CLI args
-    // Base64 is determined by args.base64 directly
-    config.images.format = args.format.clone();
-    config.images.scale = args.scale as f32;
-
-    // Get token
-    let token = config
-        .token
-        .clone()
-        .or_else(|| TokenManager::get().ok().flatten())
-        .context("No authentication token found. Run 'figma-cli auth login' first")?;
+    ctx.config.images.format = args.format.clone();
+    ctx.config.images.scale = args.scale as f32;
 
     // Determine frame IDs
     let frame_ids = if let Some(frames) = args.frames {
@@ -715,10 +674,9 @@ pub async fn handle_images(args: ImagesArgs) -> Result<()> {
     }
 
     // Process images
-
-    let processor = ImageProcessor::new(config.images.clone())?;
+    let processor = ImageProcessor::new(ctx.config.images.clone())?;
     let results = processor
-        .process_frames(&token, &file_key, &frame_ids, args.base64)
+        .process_frames(&ctx.token, &file_key, &frame_ids, args.base64)
         .await?;
 
     // Convert to AI format
@@ -762,39 +720,27 @@ pub async fn handle_query(args: QueryArgs) -> Result<()> {
     let (file_key, url_node_ids) = crate::utils::parse_file_and_nodes_from_url(&args.file)
         .map_err(|e| anyhow::anyhow!("Failed to parse file/node IDs: {e}"))?;
 
-    let config = if let Some(config_path) = args.config {
-        Config::load_from(&config_path)?
-    } else {
-        Config::load()?
-    };
-
-    let token = config
-        .token
-        .clone()
-        .or_else(|| TokenManager::get().ok().flatten())
-        .context("No authentication token found. Run 'figma-cli auth login' first")?;
-
-    let cache_dir = config.cache_path();
-    let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
-
-    let client = FigmaClient::with_timeout(token, config.http.timeout)?.with_cache(cache);
+    let ctx = ClientContext::new(args.config.as_deref())?;
 
     let data = if let Some(node_ids) = args.nodes.as_ref().or(Some(&url_node_ids)) {
         if !node_ids.is_empty() {
-            let response = client
+            let response = ctx
+                .client
                 .get_nodes(&file_key, node_ids, args.depth)
                 .await
                 .context("Failed to fetch nodes")?;
             serde_json::to_value(&response)?
         } else {
-            let file = client
+            let file = ctx
+                .client
                 .get_file(&file_key, args.depth)
                 .await
                 .context("Failed to fetch file")?;
             serde_json::to_value(&file)?
         }
     } else {
-        let file = client
+        let file = ctx
+            .client
             .get_file(&file_key, args.depth)
             .await
             .context("Failed to fetch file")?;

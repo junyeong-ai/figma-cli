@@ -1,6 +1,6 @@
 //! Text node extraction
 
-use crate::models::document::Node;
+use crate::models::document::{Node, NodeData};
 use crate::models::extraction::{ExtractedText, HierarchyPath, TextNodeType, TextStyleInfo};
 use crate::service::traversal::NodeVisitor;
 
@@ -26,14 +26,17 @@ impl TextExtractor {
 
 impl NodeVisitor for TextExtractor {
     fn visit_node(&mut self, node: &Node, _depth: usize, path: &[String]) {
-        let (id, node_type, characters, style) = match node {
-            Node::Text {
-                id,
-                characters,
-                style,
+        let (node_type, characters, style) = match &node.data {
+            NodeData::Text {
+                characters, style, ..
+            } => (TextNodeType::Text, characters.as_str(), style.as_ref()),
+            NodeData::Sticky { characters, .. } => {
+                (TextNodeType::Sticky, characters.as_str(), None)
+            }
+            NodeData::Other {
+                characters: Some(chars),
                 ..
-            } => (id, TextNodeType::Text, characters, style.as_ref()),
-            Node::Sticky { id, characters, .. } => (id, TextNodeType::Sticky, characters, None),
+            } if !chars.trim().is_empty() => (TextNodeType::Text, chars.as_str(), None),
             _ => return,
         };
 
@@ -51,9 +54,9 @@ impl NodeVisitor for TextExtractor {
         });
 
         self.texts.push(ExtractedText {
-            node_id: id.clone(),
+            node_id: node.id().to_string(),
             node_type,
-            text: characters.clone(),
+            text: characters.to_string(),
             path: build_hierarchy_path(path),
             sequence_number: self.sequence_number,
             style: style_info,
@@ -96,22 +99,26 @@ fn is_section_name(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::document::TypeStyle;
+    use crate::models::document::{NodeBase, TypeStyle};
 
     fn create_text_node(id: &str, text: &str) -> Node {
-        Node::Text {
-            node_type: "TEXT".to_string(),
-            id: id.to_string(),
-            name: "Text".to_string(),
-            visible: true,
-            locked: false,
-            characters: text.to_string(),
-            absolute_bounding_box: None,
-            style: Some(TypeStyle {
-                font_family: Some("Inter".to_string()),
-                font_size: Some(16.0),
-                font_weight: Some(400),
-            }),
+        Node {
+            base: NodeBase {
+                node_type: "TEXT".to_string(),
+                id: id.to_string(),
+                name: "Text".to_string(),
+                visible: true,
+                locked: false,
+            },
+            data: NodeData::Text {
+                characters: text.to_string(),
+                absolute_bounding_box: None,
+                style: Some(TypeStyle {
+                    font_family: Some("Inter".to_string()),
+                    font_size: Some(16.0),
+                    font_weight: Some(400),
+                }),
+            },
         }
     }
 
@@ -170,15 +177,19 @@ mod tests {
             "Frame 1".to_string(),
         ];
 
-        let sticky = Node::Sticky {
-            node_type: "STICKY".to_string(),
-            id: "2:1".to_string(),
-            name: "Note".to_string(),
-            visible: true,
-            locked: false,
-            characters: "TODO: Review this implementation".to_string(),
-            absolute_bounding_box: None,
-            fills: vec![],
+        let sticky = Node {
+            base: NodeBase {
+                node_type: "STICKY".to_string(),
+                id: "2:1".to_string(),
+                name: "Note".to_string(),
+                visible: true,
+                locked: false,
+            },
+            data: NodeData::Sticky {
+                characters: "TODO: Review this implementation".to_string(),
+                absolute_bounding_box: None,
+                fills: vec![],
+            },
         };
 
         extractor.visit_node(&sticky, 2, &path);

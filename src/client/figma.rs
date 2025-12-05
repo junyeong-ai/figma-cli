@@ -99,11 +99,13 @@ impl FigmaClient {
     /// Get a Figma file by key with optional depth parameter
     pub async fn get_file(&self, file_key: &str, depth: Option<u32>) -> Result<FigmaFile> {
         if let Some(cache) = &self.cache
-            && let Ok(Some(mut cached)) = cache.get_file(file_key, depth)
+            && let Ok(Some(cached_value)) = cache.get_file(file_key, depth)
         {
             tracing::info!("Cache hit for file: {} (depth: {:?})", file_key, depth);
-            cached.file_key = file_key.to_string();
-            return Ok(cached);
+            let mut file: FigmaFile = serde_json::from_value(cached_value)
+                .map_err(|e| Error::parse(format!("Cache deserialization failed: {e}")))?;
+            file.file_key = file_key.to_string();
+            return Ok(file);
         }
 
         let url = format!("{FIGMA_API_BASE}/files/{file_key}");
@@ -159,10 +161,17 @@ impl FigmaClient {
             file.version
         );
 
-        if let Some(cache) = &self.cache
-            && let Err(e) = cache.put_file(&file, depth)
-        {
-            tracing::warn!("Failed to cache file: {}", e);
+        if let Some(cache) = &self.cache {
+            match serde_json::to_value(&file) {
+                Ok(value) => {
+                    if let Err(e) = cache.put_file(&file.file_key, &file.version, &value, depth) {
+                        tracing::warn!("Failed to cache file: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to serialize file for cache: {}", e);
+                }
+            }
         }
 
         Ok(file)
