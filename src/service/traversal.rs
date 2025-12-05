@@ -70,7 +70,8 @@ fn get_children(node: &Node) -> &[Node] {
         | Node::Instance { children, .. }
         | Node::BooleanOperation { children, .. }
         | Node::Table { children, .. }
-        | Node::TableCell { children, .. } => children,
+        | Node::TableCell { children, .. }
+        | Node::Other { children, .. } => children,
         _ => &[],
     }
 }

@@ -1,7 +1,8 @@
 //! Figma API document structures
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -49,8 +50,7 @@ pub struct Document {
     pub children: Vec<Node>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, Serialize)]
 pub enum Node {
     Canvas {
         #[serde(rename = "type")]
@@ -576,10 +576,690 @@ pub enum Node {
         #[serde(default)]
         children: Vec<Node>,
     },
+
+    /// Catch-all for unknown node types
+    Other {
+        #[serde(rename = "type")]
+        node_type: String,
+        id: String,
+        name: String,
+        #[serde(default = "default_true")]
+        visible: bool,
+        #[serde(default)]
+        locked: bool,
+        #[serde(default)]
+        characters: Option<String>,
+        #[serde(default)]
+        children: Vec<Node>,
+    },
 }
 
 const fn default_true() -> bool {
     true
+}
+
+impl<'de> Deserialize<'de> for Node {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let node_type = value
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("UNKNOWN");
+
+        match node_type {
+            "CANVAS" => deserialize_variant::<CanvasData, D>(value).map(|d| Node::Canvas {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                background_color: d.background_color,
+                export_settings: d.export_settings,
+                children: d.children,
+            }),
+            "SECTION" => deserialize_variant::<SectionData, D>(value).map(|d| Node::Section {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                absolute_render_bounds: d.absolute_render_bounds,
+                fills: d.fills,
+                strokes: d.strokes,
+                stroke_weight: d.stroke_weight,
+                stroke_align: d.stroke_align,
+                section_contents_hidden: d.section_contents_hidden,
+                children: d.children,
+            }),
+            "FRAME" => deserialize_variant::<FrameData, D>(value).map(|d| Node::Frame {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+                clips_content: d.clips_content,
+                bound_variables: d.bound_variables,
+                children: d.children,
+            }),
+            "GROUP" => deserialize_variant::<GroupData, D>(value).map(|d| Node::Group {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                children: d.children,
+            }),
+            "TEXT" => deserialize_variant::<TextData, D>(value).map(|d| Node::Text {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                characters: d.characters,
+                absolute_bounding_box: d.absolute_bounding_box,
+                style: d.style,
+            }),
+            "RECTANGLE" => deserialize_variant::<RectangleData, D>(value).map(|d| Node::Rectangle {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                corner_radius: d.corner_radius,
+                fills: d.fills,
+            }),
+            "VECTOR" => deserialize_variant::<VectorData, D>(value).map(|d| Node::Vector {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+            }),
+            "COMPONENT" => deserialize_variant::<ComponentData, D>(value).map(|d| Node::Component {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                component_key: d.component_key,
+                absolute_bounding_box: d.absolute_bounding_box,
+                children: d.children,
+            }),
+            "COMPONENT_SET" => {
+                deserialize_variant::<ComponentSetData, D>(value).map(|d| Node::ComponentSet {
+                    node_type: d.node_type,
+                    id: d.id,
+                    name: d.name,
+                    visible: d.visible,
+                    locked: d.locked,
+                    component_key: d.component_key,
+                    absolute_bounding_box: d.absolute_bounding_box,
+                    children: d.children,
+                })
+            }
+            "INSTANCE" => deserialize_variant::<InstanceData, D>(value).map(|d| Node::Instance {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                component_id: d.component_id,
+                absolute_bounding_box: d.absolute_bounding_box,
+                children: d.children,
+            }),
+            "SHAPE_WITH_TEXT" => {
+                deserialize_variant::<ShapeWithTextData, D>(value).map(|d| Node::ShapeWithText {
+                    node_type: d.node_type,
+                    id: d.id,
+                    name: d.name,
+                    visible: d.visible,
+                    locked: d.locked,
+                    absolute_bounding_box: d.absolute_bounding_box,
+                    fills: d.fills,
+                })
+            }
+            "ELLIPSE" => deserialize_variant::<EllipseData, D>(value).map(|d| Node::Ellipse {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+            }),
+            "LINE" => deserialize_variant::<LineData, D>(value).map(|d| Node::Line {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+            }),
+            "REGULAR_POLYGON" => {
+                deserialize_variant::<PolygonData, D>(value).map(|d| Node::Polygon {
+                    node_type: d.node_type,
+                    id: d.id,
+                    name: d.name,
+                    visible: d.visible,
+                    locked: d.locked,
+                    absolute_bounding_box: d.absolute_bounding_box,
+                    fills: d.fills,
+                })
+            }
+            "STAR" => deserialize_variant::<StarData, D>(value).map(|d| Node::Star {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+            }),
+            "BOOLEAN_OPERATION" => {
+                deserialize_variant::<BooleanOperationData, D>(value).map(|d| Node::BooleanOperation {
+                    node_type: d.node_type,
+                    id: d.id,
+                    name: d.name,
+                    visible: d.visible,
+                    locked: d.locked,
+                    absolute_bounding_box: d.absolute_bounding_box,
+                    fills: d.fills,
+                    children: d.children,
+                })
+            }
+            "STICKY" => deserialize_variant::<StickyData, D>(value).map(|d| Node::Sticky {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                characters: d.characters,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+            }),
+            "CONNECTOR" => deserialize_variant::<ConnectorData, D>(value).map(|d| Node::Connector {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+            }),
+            "WIDGET" => deserialize_variant::<WidgetData, D>(value).map(|d| Node::Widget {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+            }),
+            "TABLE" => deserialize_variant::<TableData, D>(value).map(|d| Node::Table {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+                children: d.children,
+            }),
+            "TABLE_CELL" => deserialize_variant::<TableCellData, D>(value).map(|d| Node::TableCell {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                absolute_bounding_box: d.absolute_bounding_box,
+                fills: d.fills,
+                children: d.children,
+            }),
+            _ => deserialize_variant::<OtherData, D>(value).map(|d| Node::Other {
+                node_type: d.node_type,
+                id: d.id,
+                name: d.name,
+                visible: d.visible,
+                locked: d.locked,
+                characters: d.characters,
+                children: d.children,
+            }),
+        }
+    }
+}
+
+fn deserialize_variant<'de, T, D>(value: Value) -> Result<T, D::Error>
+where
+    T: serde::de::DeserializeOwned,
+    D: Deserializer<'de>,
+{
+    serde_json::from_value(value).map_err(serde::de::Error::custom)
+}
+
+// Helper structs for deserialization
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CanvasData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "backgroundColor", default, with = "option_struct")]
+    background_color: Option<Color>,
+    #[serde(rename = "exportSettings", default)]
+    export_settings: Vec<ExportSetting>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SectionData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(rename = "absoluteRenderBounds", default, with = "option_struct")]
+    absolute_render_bounds: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+    #[serde(default)]
+    strokes: Vec<Paint>,
+    #[serde(rename = "strokeWeight", default)]
+    stroke_weight: f64,
+    #[serde(rename = "strokeAlign", default)]
+    stroke_align: String,
+    #[serde(rename = "sectionContentsHidden", default)]
+    section_contents_hidden: bool,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FrameData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+    #[serde(rename = "clipsContent", default)]
+    clips_content: bool,
+    #[serde(rename = "boundVariables", default, skip_serializing)]
+    bound_variables: Option<Value>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GroupData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TextData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(default)]
+    characters: String,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default, with = "option_struct")]
+    style: Option<TypeStyle>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RectangleData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(rename = "cornerRadius", default)]
+    corner_radius: f64,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VectorData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ComponentData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "componentKey")]
+    component_key: Option<String>,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ComponentSetData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "componentKey")]
+    component_key: Option<String>,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstanceData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "componentId", default)]
+    component_id: String,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ShapeWithTextData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EllipseData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LineData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PolygonData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StarData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BooleanOperationData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StickyData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(default)]
+    characters: String,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConnectorData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WidgetData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TableData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TableCellData {
+    #[serde(rename = "type")]
+    node_type: String,
+    id: String,
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(rename = "absoluteBoundingBox", default, with = "option_struct")]
+    absolute_bounding_box: Option<BoundingBox>,
+    #[serde(default)]
+    fills: Vec<Paint>,
+    #[serde(default)]
+    children: Vec<Node>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OtherData {
+    #[serde(rename = "type", default)]
+    node_type: String,
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default = "default_true")]
+    visible: bool,
+    #[serde(default)]
+    locked: bool,
+    #[serde(default)]
+    characters: Option<String>,
+    #[serde(default)]
+    children: Vec<Node>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -747,7 +1427,8 @@ impl Node {
             | Self::Connector { id, .. }
             | Self::Widget { id, .. }
             | Self::Table { id, .. }
-            | Self::TableCell { id, .. } => id,
+            | Self::TableCell { id, .. }
+            | Self::Other { id, .. } => id,
         }
     }
 
@@ -773,7 +1454,8 @@ impl Node {
             | Self::Connector { name, .. }
             | Self::Widget { name, .. }
             | Self::Table { name, .. }
-            | Self::TableCell { name, .. } => name,
+            | Self::TableCell { name, .. }
+            | Self::Other { name, .. } => name,
         }
     }
 
@@ -799,7 +1481,8 @@ impl Node {
             | Self::Connector { visible, .. }
             | Self::Widget { visible, .. }
             | Self::Table { visible, .. }
-            | Self::TableCell { visible, .. } => *visible,
+            | Self::TableCell { visible, .. }
+            | Self::Other { visible, .. } => *visible,
         }
     }
 
