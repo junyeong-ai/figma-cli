@@ -328,11 +328,9 @@ fn handle_config_set(key: &str, value: &str) -> Result<()> {
 fn handle_config_get(key: &str) -> Result<()> {
     // Special case: token uses TokenManager
     if key == "token" {
-        if TokenManager::get().ok().flatten().is_some() {
-            let token = TokenManager::get()?.context("No token found")?;
-            println!("{}", mask_token(&token));
-        } else {
-            println!("Not set");
+        match TokenManager::get()? {
+            Some(token) => println!("{}", mask_token(&token)),
+            None => println!("Not set"),
         }
         return Ok(());
     }
@@ -389,12 +387,9 @@ fn confirm_overwrite(config_path: &std::path::Path) -> Result<bool> {
 
 /// Print token status with masking
 fn print_token_status() {
-    if TokenManager::get().ok().flatten().is_some() {
-        if let Ok(Some(token)) = TokenManager::get() {
-            println!("  Token:  {}", mask_token(&token));
-        }
-    } else {
-        println!("  Token:  Not set");
+    match TokenManager::get() {
+        Ok(Some(token)) => println!("  Token:  {}", mask_token(&token)),
+        _ => println!("  Token:  Not set"),
     }
 }
 

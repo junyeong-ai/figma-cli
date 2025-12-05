@@ -82,11 +82,6 @@ impl FigmaClient {
         } else if response.status().as_u16() == 401 {
             Err(Error::Auth("Invalid token".to_string()))
         } else if response.status().as_u16() == 429 {
-            let _retry_after = response
-                .headers()
-                .get("retry-after")
-                .and_then(|h| h.to_str().ok())
-                .unwrap_or("60");
             Err(Error::RateLimit)
         } else {
             Err(Error::other(format!(
@@ -305,11 +300,6 @@ impl FigmaClient {
         }
 
         if status.as_u16() == 429 {
-            let _retry_after = response
-                .headers()
-                .get("retry-after")
-                .and_then(|h| h.to_str().ok())
-                .unwrap_or("60");
             return Error::RateLimit;
         }
 
