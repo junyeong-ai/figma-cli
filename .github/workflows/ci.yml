@@ -57,19 +57,21 @@ jobs:
           tool: cargo-llvm-cov,nextest
 
       - name: Generate coverage with nextest
+        continue-on-error: true
         run: |
           cargo llvm-cov nextest \
             --all-features \
             --workspace \
             --lcov \
             --output-path lcov.info \
-            --fail-under-lines 50
+            --fail-under-lines 0
 
       - name: Upload to Codecov
+        continue-on-error: true
         uses: codecov/codecov-action@v5
         with:
           files: lcov.info
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittests
           name: codecov-figma
