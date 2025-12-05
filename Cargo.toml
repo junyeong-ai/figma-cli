@@ -32,42 +32,42 @@ name = "figma_cli"
 path = "src/lib.rs"
 
 [dependencies]
-clap = { version = "4.5", features = ["derive", "env", "cargo", "unicode", "wrap_help"] }
+clap = { version = "4.5.53", features = ["derive", "env", "cargo", "unicode", "wrap_help"] }
 tokio = { version = "1.48", features = ["full"] }
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream", "gzip", "brotli", "deflate"], default-features = false }
-serde = { version = "1.0", features = ["derive", "rc"] }
-serde_json = { version = "1.0", features = ["raw_value", "preserve_order", "arbitrary_precision"] }
+reqwest = { version = "0.12.24", features = ["json", "rustls-tls", "stream", "gzip", "brotli", "deflate"], default-features = false }
+serde = { version = "1.0.228", features = ["derive", "rc"] }
+serde_json = { version = "1.0.145", features = ["raw_value", "preserve_order", "arbitrary_precision"] }
 serde_path_to_error = "0.1"
-toml = "0.8"
+toml = "0.9.8"
 dirs = "6.0"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt", "ansi"] }
+tracing = "0.1.43"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json", "fmt", "ansi"] }
 anyhow = "1.0"
-thiserror = "2.0"
-rayon = "1.10"
+thiserror = "2.0.17"
+rayon = "1.11"
 crossbeam = "0.8"
 dashmap = "6.1"
 parking_lot = "0.12"
-lru = "0.12"
+lru = "0.16.2"
 once_cell = "1.21"
 bytes = "1.10"
 futures = "0.3"
-blake3 = "1.5"
+blake3 = "1.8.2"
 zeroize = { version = "1.8", features = ["derive", "std"] }
 base64 = "0.22"
 url = "2.5"
 regex = "1.12"
-chrono = { version = "0.4", features = ["serde", "clock", "std"] }
+chrono = { version = "0.4.42", features = ["serde", "clock", "std"] }
 jmespath = "0.4"
 
 [dev-dependencies]
-wiremock = "0.6"
-tempfile = "3.16"
-criterion = "0.6"
-proptest = "1.6"
+wiremock = "0.6.5"
+tempfile = "3.23"
+criterion = "0.8"
+proptest = "1.9"
 pretty_assertions = "1.4"
 serial_test = "3.2"
-rstest = "0.23"
+rstest = "0.26"
 
 [profile.release]
 opt-level = 3
