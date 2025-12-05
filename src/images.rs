@@ -32,7 +32,7 @@ pub struct ImageResult {
 #[derive(Debug, Deserialize)]
 pub struct FigmaImageResponse {
     pub err: Option<String>,
-    pub images: HashMap<String, String>,
+    pub images: HashMap<String, Option<String>>,
 }
 
 impl ImageProcessor {
@@ -121,7 +121,26 @@ impl ImageProcessor {
             anyhow::bail!("Figma API error: {err}");
         }
 
-        Ok(figma_response.images)
+        let mut valid_images = HashMap::new();
+        for (node_id, url) in figma_response.images {
+            match url {
+                Some(u) => {
+                    valid_images.insert(node_id, u);
+                }
+                None => {
+                    tracing::warn!("Node '{}' returned null URL (not renderable)", node_id);
+                }
+            }
+        }
+
+        if valid_images.is_empty() && !node_ids.is_empty() {
+            anyhow::bail!(
+                "No valid image URLs returned. {} node(s) may be deleted or not renderable.",
+                node_ids.len()
+            );
+        }
+
+        Ok(valid_images)
     }
 
     /// Process image as base64

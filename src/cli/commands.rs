@@ -30,9 +30,7 @@ pub async fn handle_extract(args: ExtractArgs) -> Result<()> {
     let cache_dir = config.cache_path();
     let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
 
-    let client = FigmaClient::new(token)?.with_cache(cache);
-
-    // Create progress spinner
+    let client = FigmaClient::with_timeout(token, config.http.timeout)?.with_cache(cache);
 
     // Build filter criteria
     let mut filter = FilterCriteria::new();
@@ -616,9 +614,7 @@ pub async fn handle_inspect(args: InspectArgs) -> Result<()> {
     let cache_dir = config.cache_path();
     let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
 
-    let client = FigmaClient::new(token)?.with_cache(cache);
-
-    // Create progress spinner
+    let client = FigmaClient::with_timeout(token, config.http.timeout)?.with_cache(cache);
 
     // Fetch nodes
     let nodes_response = client
@@ -773,7 +769,7 @@ pub async fn handle_query(args: QueryArgs) -> Result<()> {
     let cache_dir = config.cache_path();
     let cache = Arc::new(Cache::new(cache_dir, config.cache.ttl)?);
 
-    let client = FigmaClient::new(token)?.with_cache(cache);
+    let client = FigmaClient::with_timeout(token, config.http.timeout)?.with_cache(cache);
 
     let data = if let Some(node_ids) = args.nodes.as_ref().or(Some(&url_node_ids)) {
         if !node_ids.is_empty() {

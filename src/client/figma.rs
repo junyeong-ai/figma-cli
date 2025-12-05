@@ -22,8 +22,13 @@ pub struct FigmaClient {
 impl FigmaClient {
     /// Create a new Figma client with the given access token
     pub fn new(token: String) -> Result<Self> {
+        Self::with_timeout(token, 30)
+    }
+
+    /// Create a new Figma client with custom timeout
+    pub fn with_timeout(token: String, timeout_secs: u64) -> Result<Self> {
         let client = HttpClient::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(timeout_secs))
             .build()
             .map_err(|e| Error::network(format!("Failed to create HTTP client: {e}")))?;
 
@@ -327,7 +332,7 @@ pub struct ImageResponse {
 pub struct NodesResponse {
     pub name: String,
     #[serde(default)]
-    pub nodes: std::collections::HashMap<String, NodeResult>,
+    pub nodes: std::collections::HashMap<String, Option<NodeResult>>,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
