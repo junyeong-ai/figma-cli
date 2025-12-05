@@ -99,9 +99,10 @@ impl FigmaClient {
     /// Get a Figma file by key with optional depth parameter
     pub async fn get_file(&self, file_key: &str, depth: Option<u32>) -> Result<FigmaFile> {
         if let Some(cache) = &self.cache
-            && let Ok(Some(cached)) = cache.get_file(file_key, depth)
+            && let Ok(Some(mut cached)) = cache.get_file(file_key, depth)
         {
             tracing::info!("Cache hit for file: {} (depth: {:?})", file_key, depth);
+            cached.file_key = file_key.to_string();
             return Ok(cached);
         }
 

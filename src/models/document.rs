@@ -51,6 +51,7 @@ pub struct Document {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
 pub enum Node {
     Canvas {
         #[serde(rename = "type")]
