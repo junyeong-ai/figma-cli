@@ -159,8 +159,10 @@ impl FigmaClient {
             file.version
         );
 
-        if let Some(cache) = &self.cache {
-            let _ = cache.put_file(&file, depth);
+        if let Some(cache) = &self.cache
+            && let Err(e) = cache.put_file(&file, depth)
+        {
+            tracing::warn!("Failed to cache file: {}", e);
         }
 
         Ok(file)
@@ -220,10 +222,17 @@ impl FigmaClient {
             .await
             .map_err(|e| Error::parse(format!("Failed to parse nodes response: {e}")))?;
 
-        if let Some(cache) = &self.cache
-            && let Ok(value) = serde_json::to_value(&nodes_response)
-        {
-            let _ = cache.put_nodes(file_key, node_ids, depth, &value);
+        if let Some(cache) = &self.cache {
+            match serde_json::to_value(&nodes_response) {
+                Ok(value) => {
+                    if let Err(e) = cache.put_nodes(file_key, node_ids, depth, &value) {
+                        tracing::warn!("Failed to cache nodes: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to serialize nodes for cache: {}", e);
+                }
+            }
         }
 
         Ok(nodes_response)

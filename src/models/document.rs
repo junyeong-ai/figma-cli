@@ -667,16 +667,18 @@ impl<'de> Deserialize<'de> for Node {
                 absolute_bounding_box: d.absolute_bounding_box,
                 style: d.style,
             }),
-            "RECTANGLE" => deserialize_variant::<RectangleData, D>(value).map(|d| Node::Rectangle {
-                node_type: d.node_type,
-                id: d.id,
-                name: d.name,
-                visible: d.visible,
-                locked: d.locked,
-                absolute_bounding_box: d.absolute_bounding_box,
-                corner_radius: d.corner_radius,
-                fills: d.fills,
-            }),
+            "RECTANGLE" => {
+                deserialize_variant::<RectangleData, D>(value).map(|d| Node::Rectangle {
+                    node_type: d.node_type,
+                    id: d.id,
+                    name: d.name,
+                    visible: d.visible,
+                    locked: d.locked,
+                    absolute_bounding_box: d.absolute_bounding_box,
+                    corner_radius: d.corner_radius,
+                    fills: d.fills,
+                })
+            }
             "VECTOR" => deserialize_variant::<VectorData, D>(value).map(|d| Node::Vector {
                 node_type: d.node_type,
                 id: d.id,
@@ -686,16 +688,18 @@ impl<'de> Deserialize<'de> for Node {
                 absolute_bounding_box: d.absolute_bounding_box,
                 fills: d.fills,
             }),
-            "COMPONENT" => deserialize_variant::<ComponentData, D>(value).map(|d| Node::Component {
-                node_type: d.node_type,
-                id: d.id,
-                name: d.name,
-                visible: d.visible,
-                locked: d.locked,
-                component_key: d.component_key,
-                absolute_bounding_box: d.absolute_bounding_box,
-                children: d.children,
-            }),
+            "COMPONENT" => {
+                deserialize_variant::<ComponentData, D>(value).map(|d| Node::Component {
+                    node_type: d.node_type,
+                    id: d.id,
+                    name: d.name,
+                    visible: d.visible,
+                    locked: d.locked,
+                    component_key: d.component_key,
+                    absolute_bounding_box: d.absolute_bounding_box,
+                    children: d.children,
+                })
+            }
             "COMPONENT_SET" => {
                 deserialize_variant::<ComponentSetData, D>(value).map(|d| Node::ComponentSet {
                     node_type: d.node_type,
@@ -767,8 +771,8 @@ impl<'de> Deserialize<'de> for Node {
                 absolute_bounding_box: d.absolute_bounding_box,
                 fills: d.fills,
             }),
-            "BOOLEAN_OPERATION" => {
-                deserialize_variant::<BooleanOperationData, D>(value).map(|d| Node::BooleanOperation {
+            "BOOLEAN_OPERATION" => deserialize_variant::<BooleanOperationData, D>(value).map(|d| {
+                Node::BooleanOperation {
                     node_type: d.node_type,
                     id: d.id,
                     name: d.name,
@@ -777,8 +781,8 @@ impl<'de> Deserialize<'de> for Node {
                     absolute_bounding_box: d.absolute_bounding_box,
                     fills: d.fills,
                     children: d.children,
-                })
-            }
+                }
+            }),
             "STICKY" => deserialize_variant::<StickyData, D>(value).map(|d| Node::Sticky {
                 node_type: d.node_type,
                 id: d.id,
@@ -789,15 +793,17 @@ impl<'de> Deserialize<'de> for Node {
                 absolute_bounding_box: d.absolute_bounding_box,
                 fills: d.fills,
             }),
-            "CONNECTOR" => deserialize_variant::<ConnectorData, D>(value).map(|d| Node::Connector {
-                node_type: d.node_type,
-                id: d.id,
-                name: d.name,
-                visible: d.visible,
-                locked: d.locked,
-                absolute_bounding_box: d.absolute_bounding_box,
-                fills: d.fills,
-            }),
+            "CONNECTOR" => {
+                deserialize_variant::<ConnectorData, D>(value).map(|d| Node::Connector {
+                    node_type: d.node_type,
+                    id: d.id,
+                    name: d.name,
+                    visible: d.visible,
+                    locked: d.locked,
+                    absolute_bounding_box: d.absolute_bounding_box,
+                    fills: d.fills,
+                })
+            }
             "WIDGET" => deserialize_variant::<WidgetData, D>(value).map(|d| Node::Widget {
                 node_type: d.node_type,
                 id: d.id,
@@ -817,16 +823,18 @@ impl<'de> Deserialize<'de> for Node {
                 fills: d.fills,
                 children: d.children,
             }),
-            "TABLE_CELL" => deserialize_variant::<TableCellData, D>(value).map(|d| Node::TableCell {
-                node_type: d.node_type,
-                id: d.id,
-                name: d.name,
-                visible: d.visible,
-                locked: d.locked,
-                absolute_bounding_box: d.absolute_bounding_box,
-                fills: d.fills,
-                children: d.children,
-            }),
+            "TABLE_CELL" => {
+                deserialize_variant::<TableCellData, D>(value).map(|d| Node::TableCell {
+                    node_type: d.node_type,
+                    id: d.id,
+                    name: d.name,
+                    visible: d.visible,
+                    locked: d.locked,
+                    absolute_bounding_box: d.absolute_bounding_box,
+                    fills: d.fills,
+                    children: d.children,
+                })
+            }
             _ => deserialize_variant::<OtherData, D>(value).map(|d| Node::Other {
                 node_type: d.node_type,
                 id: d.id,

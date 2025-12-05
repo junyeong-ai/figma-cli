@@ -65,7 +65,10 @@ impl NodeVisitor for TextExtractor {
 fn build_hierarchy_path(path: &[String]) -> HierarchyPath {
     let mut iter = path.iter().skip(1);
 
-    let page_name = iter.next().cloned().unwrap_or_else(|| "Unknown".to_string());
+    let page_name = iter
+        .next()
+        .cloned()
+        .unwrap_or_else(|| "Unknown".to_string());
 
     let mut section_name = None;
     let mut frame_names = Vec::new();

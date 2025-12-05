@@ -43,7 +43,9 @@ impl FilterCriteria {
 
     pub fn matches_page(&self, page_name: &str) -> bool {
         if let Some(pages) = &self.page_names
-            && !pages.iter().any(|p| p == page_name || page_name.contains(p))
+            && !pages
+                .iter()
+                .any(|p| p == page_name || page_name.contains(p))
         {
             return false;
         }

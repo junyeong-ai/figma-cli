@@ -17,11 +17,7 @@ pub fn traverse_document<V: NodeVisitor>(document: &Document, visitor: &mut V) {
 }
 
 /// Traverse specific pages (Canvas nodes) from a document
-pub fn traverse_pages<V: NodeVisitor>(
-    document: &Document,
-    page_ids: &[String],
-    visitor: &mut V,
-) {
+pub fn traverse_pages<V: NodeVisitor>(document: &Document, page_ids: &[String], visitor: &mut V) {
     let mut path = vec![document.name.clone()];
 
     for child in &document.children {
