@@ -116,6 +116,7 @@ jobs:
         with:
           files: release/*
           generate_release_notes: true
+          target_commitish: ${{ github.sha }}
           draft: false
           prerelease: false
         env:
